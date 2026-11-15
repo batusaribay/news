@@ -6,27 +6,53 @@ use clap::ValueEnum;
 pub enum Source {
     #[value(name = "bbc")]
     Bbc,
-    #[value(name = "google")]
-    Google,
-    #[value(name = "lobsters")]
-    Lobsters,
-    #[value(name = "omarchy")]
-    Omarchy,
     #[value(name = "github")]
     Github,
     #[value(name = "hackernews")]
     Hn,
+    #[value(name = "lobsters")]
+    Lobsters,
+    #[value(name = "omarchy")]
+    Omarchy,
 }
 
 impl Source {
+    /// Sources in the order shown by the `sources` command and help.
+    pub const ALL: [Source; 5] = [
+        Source::Bbc,
+        Source::Github,
+        Source::Hn,
+        Source::Lobsters,
+        Source::Omarchy,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Source::Bbc => "bbc",
+            Source::Github => "github",
+            Source::Hn => "hackernews",
+            Source::Lobsters => "lobsters",
+            Source::Omarchy => "omarchy",
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Source::Bbc => "BBC News",
-            Source::Google => "Google News",
-            Source::Lobsters => "Lobsters",
-            Source::Omarchy => "Omarchy News",
             Source::Github => "GitHub Trending",
             Source::Hn => "Hacker News",
+            Source::Lobsters => "Lobsters",
+            Source::Omarchy => "Omarchy News",
+        }
+    }
+
+    pub fn description(self) -> &'static str {
+        match self {
+            Source::Bbc => "General world and UK news.",
+            Source::Github => "Repositories gaining stars on GitHub.",
+            Source::Hn => "Technology and startup discussion.",
+            Source::Lobsters => "Computing and technology links from the community.",
+            Source::Omarchy => "Release notes and news from Omarchy.",
         }
     }
 
@@ -34,15 +60,14 @@ impl Source {
     pub fn feed_url(self, topic: Option<&str>) -> Result<String> {
         match self {
             Source::Bbc => bbc_feed(topic),
-            Source::Google => google_feed(topic),
             Source::Lobsters => lobsters_feed(topic),
+            Source::Hn => hn_feed(topic),
             Source::Omarchy => {
                 if topic.is_some() {
                     bail!("Omarchy News has no topics");
                 }
                 Ok("https://omarchy.org/news/rss.xml".to_string())
             }
-            Source::Hn => hn_feed(topic),
             Source::Github => bail!("GitHub Trending is not an RSS source"),
         }
     }
@@ -90,30 +115,6 @@ fn bbc_feed(topic: Option<&str>) -> Result<String> {
     };
 
     Ok(url.to_string())
-}
-
-fn google_feed(topic: Option<&str>) -> Result<String> {
-    let topic = normalize(topic);
-    let section = match topic.as_deref() {
-        None | Some("top") | Some("news") | Some("headlines") => {
-            return Ok("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en".to_string());
-        }
-        Some("world") => "WORLD",
-        Some("nation") | Some("national") => "NATION",
-        Some("business") => "BUSINESS",
-        Some("technology") | Some("tech") => "TECHNOLOGY",
-        Some("entertainment") => "ENTERTAINMENT",
-        Some("sports") | Some("sport") => "SPORTS",
-        Some("science") => "SCIENCE",
-        Some("health") => "HEALTH",
-        Some(other) => bail!(
-            "unknown Google News topic '{other}'; use: top, world, nation, business, technology, entertainment, sports, science, health"
-        ),
-    };
-
-    Ok(format!(
-        "https://news.google.com/rss/headlines/section/topic/{section}?hl=en-US&gl=US&ceid=US:en"
-    ))
 }
 
 fn hn_feed(topic: Option<&str>) -> Result<String> {
@@ -168,14 +169,18 @@ mod tests {
     }
 
     #[test]
+    fn every_source_has_a_description() {
+        for source in Source::ALL {
+            assert!(!source.description().is_empty());
+            assert!(!source.name().is_empty());
+        }
+    }
+
+    #[test]
     fn builds_default_feeds() {
         assert_eq!(
             Source::Bbc.feed_url(None).unwrap(),
             "https://feeds.bbci.co.uk/news/rss.xml"
-        );
-        assert_eq!(
-            Source::Google.feed_url(None).unwrap(),
-            "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
         );
         assert_eq!(
             Source::Lobsters.feed_url(None).unwrap(),
@@ -185,6 +190,10 @@ mod tests {
             Source::Hn.feed_url(None).unwrap(),
             "https://hnrss.org/frontpage"
         );
+        assert_eq!(
+            Source::Omarchy.feed_url(None).unwrap(),
+            "https://omarchy.org/news/rss.xml"
+        );
     }
 
     #[test]
@@ -192,10 +201,6 @@ mod tests {
         assert_eq!(
             Source::Bbc.feed_url(Some("Sport")).unwrap(),
             "https://feeds.bbci.co.uk/sport/rss.xml"
-        );
-        assert_eq!(
-            Source::Google.feed_url(Some("business")).unwrap(),
-            "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en"
         );
         assert_eq!(
             Source::Hn.feed_url(Some("ask")).unwrap(),
@@ -214,7 +219,6 @@ mod tests {
     #[test]
     fn rejects_unknown_topics() {
         assert!(Source::Bbc.feed_url(Some("gossip")).is_err());
-        assert!(Source::Google.feed_url(Some("gossip")).is_err());
         assert!(Source::Hn.feed_url(Some("gossip")).is_err());
         assert!(Source::Omarchy.feed_url(Some("sport")).is_err());
         assert!(Source::Lobsters.feed_url(Some("rust lang")).is_err());

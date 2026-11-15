@@ -1,17 +1,16 @@
 # News Reader
 
-A small, plain-text news reader for the terminal. It reads one source at a
-time, prints the article URL, and shows a short excerpt of the article itself.
+A terminal news reader with article text.
 
-![news-reader in a terminal](preview.png)
+![news-reader showing a Lobsters story](preview.png)
 
 ## Why
 
-Headlines alone rarely tell you enough, and opening several news sites to find
-out what happened is noisy. This prints a focused digest and exits.
+A headline says what happened; the first few lines say whether it matters.
+This prints both, so you can check one source and get back to work.
 
-There is one binary, one source per run, no TUI, no GUI, no configuration file,
-and no background polling.
+It is intentionally small: one source per run, no accounts, no cache, no TUI,
+no browser.
 
 ## How it works
 
@@ -20,8 +19,8 @@ and no background polling.
 2. A single HTTP client fetches the feed with TLS verification, timeouts,
    redirect limits, and response size caps.
 3. RSS is parsed locally. Source-specific metadata is added where it is useful:
-   Hacker News points and comments, the Google News publisher, GitHub language
-   and star count, and the linked domain for link aggregators.
+   Hacker News points and comments, GitHub language and star count, and the
+   linked domain for link aggregators.
 4. Sources that provide article text in the feed (BBC and Omarchy) use it
    directly. Sources that do not (Hacker News and Lobsters) fetch the linked
    page, extract the readable content, and print a short excerpt.
@@ -32,15 +31,18 @@ and no background polling.
 
 ## Usage
 
+Running `news-reader` with no arguments prints help.
+
 ```text
 Usage: news-reader [OPTIONS] <SOURCE> [TOPIC]
 
 Arguments:
-  <SOURCE>  News source [possible values: bbc, google, lobsters, omarchy, github, hackernews]
-  [TOPIC]   Topic or time range for the source (e.g. sport, business, monthly)
+  <SOURCE>  News source [possible values: bbc, github, hackernews, lobsters, omarchy]
+  [TOPIC]   Topic or time range for the source (e.g. sport, ask, monthly)
 
 Options:
   -n, --limit <N>       Number of stories [default: 8]
+      --sources         List sources and exit
       --no-links        Do not print article URLs
       --no-color        Disable colors and hyperlinks (NO_COLOR is also respected)
       --timeout <SECS>  HTTP timeout in seconds [default: 15]
@@ -50,14 +52,16 @@ Options:
 
 ### Sources and topics
 
+`news-reader sources` (or `news-reader --sources`) prints the source names and
+a short description of each.
+
 | Source       | Topics                                                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------- |
 | `bbc`        | `top`, `world`, `uk`, `business`, `politics`, `health`, `education`, `science`, `technology`, `entertainment`, `sport`, `football` |
-| `google`     | `top`, `world`, `nation`, `business`, `technology`, `entertainment`, `sports`, `science`, `health`             |
-| `lobsters`   | any tag, e.g. `rust`, `linux`, `security`, `programming`                                                      |
-| `omarchy`    | no topics                                                                                                      |
 | `github`     | `daily`, `weekly`, `monthly`                                                                                    |
 | `hackernews` | `frontpage`, `newest`, `ask`, `show`, `jobs`, `best`                                                            |
+| `lobsters`   | any tag, e.g. `rust`, `linux`, `security`, `programming`                                                      |
+| `omarchy`    | no topics                                                                                                      |
 
 The topic defaults to the source's front page or daily range.
 
@@ -66,11 +70,11 @@ The topic defaults to the source's front page or daily range.
 ```bash
 news-reader bbc
 news-reader bbc sport
-news-reader google business
 news-reader github monthly
 news-reader hackernews ask
 news-reader lobsters rust
 
+news-reader sources
 news-reader bbc -n 5
 news-reader bbc --no-links
 NO_COLOR=1 news-reader bbc
@@ -112,8 +116,8 @@ cargo install --git https://github.com/batusaribay/news-reader.git --locked
 ## Files
 
 ```text
-src/main.rs      CLI, startup, and render orchestration
-src/source.rs    source names, topics, feed and trending URLs
+src/main.rs      CLI, startup, source list, and render orchestration
+src/source.rs    source names, descriptions, topics, feed URLs
 src/fetch.rs     HTTP client, RSS, GitHub Trending, article extraction
 src/story.rs     story model, dates, text cleanup, excerpts
 src/render.rs    terminal output and wrapping
@@ -138,21 +142,17 @@ python3 scripts/make-terminal-preview.py preview.txt preview.png
 
 ## Known issues
 
-- Google News' RSS feed does not provide article text, so those entries show
-  only the headline, publisher, and URL.
 - Article extraction depends on the destination page. Paywalls, JavaScript
   applications, and anti-bot walls can leave a story without an excerpt.
 - GitHub Trending is scraped because it has no RSS feed. A layout change can
   break that source until the selectors are updated.
-- Google News uses its US English edition.
 - There is no cache; every run fetches fresh data.
 
 ## Future ideas
 
-- Optional default source and topic in a config file
 - JSON output for scripts
 - More sources and topic aliases
-- Language and regional edition options
+- Optional local cache
 - Prebuilt release binaries
 
 ## License

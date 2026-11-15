@@ -4,13 +4,14 @@ mod source;
 mod story;
 
 use std::env;
-use std::io::{self, BufWriter, ErrorKind, IsTerminal};
+use std::ffi::OsStr;
+use std::io::{self, BufWriter, ErrorKind, IsTerminal, Write};
 use std::process::ExitCode;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
@@ -28,13 +29,17 @@ struct Cli {
     #[arg(value_enum, value_name = "SOURCE")]
     source: Source,
 
-    /// Topic or time range for the source (e.g. sport, business, monthly)
+    /// Topic or time range for the source (e.g. sport, ask, monthly)
     #[arg(value_name = "TOPIC")]
     topic: Option<String>,
 
     /// Number of stories
     #[arg(short = 'n', long, default_value_t = 8, value_name = "N", value_parser = parse_limit)]
     limit: usize,
+
+    /// List sources and exit
+    #[arg(long)]
+    sources: bool,
 
     /// Do not print article URLs
     #[arg(long)]
@@ -72,12 +77,57 @@ fn parse_timeout(value: &str) -> std::result::Result<u64, String> {
 }
 
 fn main() -> ExitCode {
+    let args: Vec<_> = env::args_os().skip(1).collect();
+
+    if args.is_empty() {
+        return print_help();
+    }
+    let wants_sources = args
+        .iter()
+        .any(|arg| arg.as_os_str() == OsStr::new("--sources"));
+    if args[0].as_os_str() == OsStr::new("sources") || wants_sources {
+        return print_sources();
+    }
+
     let cli = Cli::parse();
+    if cli.sources {
+        return print_sources();
+    }
 
     match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("error: {error:#}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn print_help() -> ExitCode {
+    let mut command = Cli::command();
+    let result = command.print_help().and_then(|_| writeln!(io::stdout()));
+    finish_output(result)
+}
+
+fn print_sources() -> ExitCode {
+    let stdout = io::stdout();
+    let mut out = BufWriter::new(stdout.lock());
+    let result = (|| -> io::Result<()> {
+        for source in Source::ALL {
+            writeln!(out, "{:<11} {}", source.name(), source.description())?;
+        }
+        out.flush()
+    })();
+
+    finish_output(result)
+}
+
+fn finish_output(result: io::Result<()>) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) if error.kind() == ErrorKind::BrokenPipe => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
             ExitCode::FAILURE
         }
     }
@@ -122,7 +172,6 @@ fn run(cli: Cli) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::CommandFactory;
 
     #[test]
     fn parses_one_source_and_topic() {
@@ -130,6 +179,7 @@ mod tests {
         assert_eq!(cli.source, Source::Hn);
         assert_eq!(cli.topic.as_deref(), Some("ask"));
         assert!(!cli.no_links);
+        assert!(!cli.sources);
     }
 
     #[test]

@@ -159,16 +159,6 @@ pub fn relative_time(published: DateTime<Utc>, now: DateTime<Utc>) -> String {
     }
 }
 
-/// Remove the " - Publisher" suffix Google appends to its headlines.
-pub fn strip_google_suffix(title: &str, publisher: &str) -> String {
-    let suffix = format!(" - {publisher}");
-    title
-        .strip_suffix(&suffix)
-        .map(str::trim_end)
-        .unwrap_or(title)
-        .to_string()
-}
-
 /// Extract the score and comment count hnrss puts in the description.
 pub fn hn_details(description: &str) -> Vec<String> {
     let text = clean_text(description);
@@ -230,18 +220,6 @@ mod tests {
         );
         assert_eq!(clean_text("caf&#233; &#x2014; open"), "café — open");
         assert_eq!(clean_text("safe\u{1b}[31mred"), "safe [31mred");
-    }
-
-    #[test]
-    fn strips_google_publisher_suffix() {
-        assert_eq!(
-            strip_google_suffix("Big news - The Washington Post", "The Washington Post"),
-            "Big news"
-        );
-        assert_eq!(
-            strip_google_suffix("Big news - Somewhere Else", "The Washington Post"),
-            "Big news - Somewhere Else"
-        );
     }
 
     #[test]

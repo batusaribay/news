@@ -13,9 +13,7 @@ use rss::{Channel, Item};
 use scraper::{ElementRef, Html, Selector};
 
 use crate::source::{Source, github_trending_url};
-use crate::story::{
-    Story, clean_text, excerpt, hn_details, host_of, parse_date, strip_google_suffix,
-};
+use crate::story::{Story, clean_text, excerpt, hn_details, host_of, parse_date};
 
 const MAX_FEED_BYTES: usize = 4 * 1024 * 1024;
 const MAX_PAGE_BYTES: usize = 4 * 1024 * 1024;
@@ -56,7 +54,7 @@ pub fn fetch(
     let body = get_text(client, &url)?;
     let mut stories = parse_feed(source, &body, limit)?;
 
-    if !matches!(source, Source::Google | Source::Github) {
+    if source != Source::Github {
         enrich_summaries(&mut stories, client);
     }
 
@@ -82,7 +80,7 @@ fn parse_feed(source: Source, body: &str, limit: usize) -> Result<Vec<Story>> {
 }
 
 fn story_from_item(source: Source, item: &Item) -> Option<Story> {
-    let mut title = clean_text(item.title()?);
+    let title = clean_text(item.title()?);
     if title.is_empty() {
         return None;
     }
@@ -102,18 +100,8 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
 
     let mut details = Vec::new();
     let mut summary = None;
-    let mut publisher = None;
 
     match source {
-        Source::Google => {
-            if let Some(name) = item.source().and_then(|source| source.title.as_deref()) {
-                let name = clean_text(name);
-                if !name.is_empty() {
-                    title = strip_google_suffix(&title, &name);
-                    publisher = Some(name);
-                }
-            }
-        }
         Source::Bbc | Source::Omarchy => {
             summary = item
                 .description()
@@ -124,15 +112,8 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
         _ => {}
     }
 
-    let has_publisher = publisher.is_some();
-    if let Some(publisher) = publisher {
-        details.insert(0, publisher);
-    }
-
     let domain = match source {
         Source::Bbc | Source::Omarchy | Source::Github => None,
-        // The publisher is more useful than news.google.com.
-        Source::Google if has_publisher => None,
         _ => host_of(&url),
     };
 
@@ -449,22 +430,6 @@ fn get_text(client: &Client, url: &str) -> Result<String> {
 mod tests {
     use super::*;
 
-    const GOOGLE_FEED: &str = r#"<?xml version="1.0"?>
-<rss version="2.0"><channel><title>Top stories</title>
-<item>
-  <title>Big news - The Washington Post</title>
-  <link>https://news.google.com/rss/articles/abc</link>
-  <pubDate>Sat, 14 Nov 2026 20:52:00 GMT</pubDate>
-  <source url="https://washingtonpost.com">The Washington Post</source>
-</item>
-<item>
-  <title>Another headline - BBC</title>
-  <link>https://news.google.com/rss/articles/def</link>
-  <pubDate>Sat, 14 Nov 2026 20:23:06 GMT</pubDate>
-  <source url="https://bbc.com">BBC</source>
-</item>
-</channel></rss>"#;
-
     const BBC_FEED: &str = r#"<?xml version="1.0"?>
 <rss version="2.0"><channel><title>BBC News</title>
 <item>
@@ -474,17 +439,6 @@ mod tests {
   <pubDate>Sat, 14 Nov 2026 20:52:00 GMT</pubDate>
 </item>
 </channel></rss>"#;
-
-    #[test]
-    fn google_stories_are_cleaned_and_labelled() {
-        let stories = parse_feed(Source::Google, GOOGLE_FEED, 8).unwrap();
-        assert_eq!(stories.len(), 2);
-        assert_eq!(stories[0].title, "Big news");
-        assert_eq!(stories[0].details, vec!["The Washington Post"]);
-        assert_eq!(stories[0].domain, None);
-        assert_eq!(stories[0].summary, None);
-        assert!(stories[0].published.is_some());
-    }
 
     #[test]
     fn feed_descriptions_become_article_text() {
@@ -498,7 +452,7 @@ mod tests {
 
     #[test]
     fn limits_are_applied() {
-        let stories = parse_feed(Source::Google, GOOGLE_FEED, 1).unwrap();
+        let stories = parse_feed(Source::Bbc, BBC_FEED, 1).unwrap();
         assert_eq!(stories.len(), 1);
     }
 
