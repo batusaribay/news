@@ -102,8 +102,8 @@ src/source.rs    source names, descriptions, topics, feed URLs
 src/fetch.rs     HTTP client, RSS, GitHub Trending, article extraction
 src/story.rs     story model, dates, text cleanup, excerpts
 src/render.rs    terminal output and wrapping
-scripts/make-terminal-preview.py   terminal preview renderer
-preview.txt                        source transcript for preview.png
+preview.png      README preview image
+preview.txt      transcript the preview was made from
 ```
 
 ## Development
@@ -113,12 +113,6 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
 cargo build --release
-```
-
-The README preview is generated from `preview.txt`:
-
-```bash
-python3 scripts/make-terminal-preview.py preview.txt preview.png
 ```
 
 ## Known issues
