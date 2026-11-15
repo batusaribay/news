@@ -31,7 +31,8 @@ no browser.
    directly. Sources that do not (Hacker News and Lobsters) fetch the linked
    page, extract the readable content, and print a short excerpt.
 5. Output is plain text: a headline, source line, URL, and excerpt. It wraps to
-   the terminal width and stays unstyled when piped.
+   the terminal width and stays unstyled when piped. Colors use the terminal's
+   ANSI palette, so they follow the active light or dark theme.
 6. One source is fetched per run. If it fails, the command fails; there is no
    aggregate mode.
 
@@ -85,8 +86,6 @@ NO_COLOR=1 news-reader bbc
 cargo install --git https://github.com/batusaribay/news-reader.git --locked
 ```
 
-The binary is installed as `news-reader`.
-
 ## Uninstall
 
 ```bash
@@ -107,42 +106,6 @@ cargo uninstall news-reader
 - Feeds and article pages are fetched over the network, but no credentials are
   read, no configuration is written, and no telemetry is sent.
 - Unsafe code is forbidden by the package lint configuration.
-
-## Files
-
-```text
-src/main.rs      CLI, startup, source list, and render orchestration
-src/source.rs    source names, descriptions, topics, feed URLs
-src/fetch.rs     HTTP client, RSS, GitHub Trending, article extraction
-src/story.rs     story model, dates, text cleanup, excerpts
-src/render.rs    terminal output and wrapping
-preview.png      README preview image
-preview.txt      transcript the preview was made from
-```
-
-## Development
-
-```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo build --release
-```
-
-## Known Issues
-
-- Article extraction depends on the destination page. Paywalls, JavaScript
-  applications, and anti-bot walls can leave a story without an excerpt.
-- GitHub Trending is scraped because it has no RSS feed. A layout change can
-  break that source until the selectors are updated.
-- There is no cache; every run fetches fresh data.
-
-## Future Ideas
-
-- JSON output for scripts
-- More sources and topic aliases
-- Optional local cache
-- Prebuilt release binaries
 
 ## License
 
