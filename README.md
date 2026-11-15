@@ -4,14 +4,6 @@ A terminal news reader with article text.
 
 ![news-reader showing a Lobsters story](preview.png)
 
-## Why
-
-A headline says what happened; the first few lines say whether it matters.
-This prints both, so you can check one source and get back to work.
-
-It is intentionally small: one source per run, no accounts, no cache, no TUI,
-no browser.
-
 ## How it works
 
 1. The selected source and topic choose an RSS feed, or GitHub's trending page
@@ -29,26 +21,15 @@ no browser.
 6. One source is fetched per run. If it fails, the command fails; there is no
    aggregate mode.
 
-## Usage
+## Commands
 
-Running `news-reader` with no arguments prints help.
-
-```text
-Usage: news-reader [OPTIONS] <SOURCE> [TOPIC]
-
-Arguments:
-  <SOURCE>  News source [possible values: bbc, github, hackernews, lobsters, omarchy]
-  [TOPIC]   Topic or time range for the source (e.g. sport, ask, monthly)
-
-Options:
-  -n, --limit <N>       Number of stories [default: 8]
-      --sources         List sources and exit
-      --no-links        Do not print article URLs
-      --no-color        Disable colors and hyperlinks (NO_COLOR is also respected)
-      --timeout <SECS>  HTTP timeout in seconds [default: 15]
-  -h, --help            Print help
-  -V, --version         Print version
-```
+| Command | Action |
+| --- | --- |
+| `news-reader` | Print help. |
+| `news-reader <source>` | Latest stories from one source. |
+| `news-reader <source> <topic>` | A topic or time range. |
+| `news-reader sources` | List sources and descriptions. |
+| `news-reader --version` | Show the version. |
 
 ### Sources and topics
 
