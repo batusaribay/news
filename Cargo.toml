@@ -1,9 +1,9 @@
 [package]
 name = "news-reader"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2024"
 rust-version = "1.88"
-description = "A terminal news reader with article text."
+description = "A news reader with article text in the terminal."
 license = "MIT"
 repository = "https://github.com/batusaribay/news-reader"
 publish = false

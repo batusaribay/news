@@ -1,6 +1,6 @@
 # News Reader
 
-A terminal news reader with article text.
+A news reader with article text in the terminal.
 
 ![Preview](preview.png)
 

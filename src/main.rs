@@ -16,12 +16,12 @@ use clap::{CommandFactory, Parser};
 use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
 
-/// Print news as plain text in the terminal.
+/// A news reader with article text in the terminal.
 #[derive(Debug, Parser)]
 #[command(
     name = "news-reader",
     version,
-    about = "Print news as plain text in the terminal.",
+    about = "A news reader with article text in the terminal.",
     styles = clap::builder::Styles::plain()
 )]
 struct Cli {
