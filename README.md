@@ -2,7 +2,21 @@
 
 A terminal news reader with article text.
 
-![news-reader showing a Lobsters story](preview.png)
+![Preview](preview.png)
+
+## What it is
+
+A single Rust binary that prints one news source at a time: headline, source
+line, URL, and a short excerpt of the article. It covers BBC, GitHub Trending,
+Hacker News, Lobsters, and Omarchy News.
+
+## Why this exists
+
+A headline says what happened; the first few lines say whether it matters.
+This prints both, so you can check one source and get back to work.
+
+It is intentionally small: one source per run, no accounts, no cache, no TUI,
+no browser.
 
 ## How it works
 
@@ -21,7 +35,9 @@ A terminal news reader with article text.
 6. One source is fetched per run. If it fails, the command fails; there is no
    aggregate mode.
 
-## Commands
+## Usage
+
+### Commands
 
 | Command | Action |
 | --- | --- |
@@ -63,20 +79,18 @@ NO_COLOR=1 news-reader bbc
 
 ## Installation
 
-**Requirements:** Rust 1.88+, a C toolchain, and CMake for the TLS dependency.
-
-```bash
-git clone https://github.com/batusaribay/news-reader.git
-cd news-reader
-cargo build --release
-cargo install --path . --locked
-```
-
-The binary is installed as `news-reader`. You can also install directly from
-the repository:
+**Requirements:** Rust 1.88+, Git, a C toolchain, and CMake for the TLS dependency.
 
 ```bash
 cargo install --git https://github.com/batusaribay/news-reader.git --locked
+```
+
+The binary is installed as `news-reader`.
+
+## Uninstall
+
+```bash
+cargo uninstall news-reader
 ```
 
 ## Security
@@ -115,7 +129,7 @@ cargo test
 cargo build --release
 ```
 
-## Known issues
+## Known Issues
 
 - Article extraction depends on the destination page. Paywalls, JavaScript
   applications, and anti-bot walls can leave a story without an excerpt.
@@ -123,7 +137,7 @@ cargo build --release
   break that source until the selectors are updated.
 - There is no cache; every run fetches fresh data.
 
-## Future ideas
+## Future Ideas
 
 - JSON output for scripts
 - More sources and topic aliases
