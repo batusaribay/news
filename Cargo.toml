@@ -1,0 +1,33 @@
+[package]
+name = "news-reader"
+version = "0.3.1"
+edition = "2024"
+rust-version = "1.88"
+description = "A plain-text terminal news reader that prints article summaries"
+license = "MIT"
+repository = "https://github.com/batusaribay/news-reader"
+publish = false
+
+[[bin]]
+name = "news-reader"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = "0.4"
+clap = { version = "4.6", features = ["derive"] }
+dom_smoothie = "0.19"
+flate2 = "1"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+rss = "2.1"
+scraper = "0.29"
+terminal_size = "0.4"
+textwrap = "0.16"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
+[lints.rust]
+unsafe_code = "forbid"

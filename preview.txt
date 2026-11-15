@@ -1,0 +1,12 @@
+$ news-reader bbc sport -n 2
+## Australia's Sayers 'took sandpaper from field' & rejects Cummins' claims
+.. BBC News · sport · 39m ago
+.. https://www.bbc.co.uk/sport/cricket/articles/c9ly4jm8djy7o
+Australia bowler Chadd Sayers says he helped take sandpaper from the field in the match prior to the
+Cape Town Test and backs Usman Khawaja's recollection over Pat Cummins'.
+
+## Spain test will reveal if Tuchel and England have learned World Cup lessons
+.. BBC News · sport · 11h ago
+.. https://www.bbc.co.uk/sport/football/articles/cq2d9l3e313zo
+England's game with world champions Spain will reveal if head coach Thomas Tuchel has learned from
+summer disappointment, says chief football writer Phil McNulty.
