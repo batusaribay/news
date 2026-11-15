@@ -57,11 +57,11 @@ impl<W: Write> Renderer<W> {
         if let Some(domain) = &story.domain {
             metadata.push(domain.clone());
         }
-        self.print_metadata(source, &metadata.join(" · "))?;
+        self.print_metadata(&metadata.join(" · "))?;
 
         if self.links && !story.url.is_empty() {
             let url: String = story.url.chars().filter(|ch| !ch.is_control()).collect();
-            let url = self.paint("34", &url);
+            let url = self.paint("2", &url);
             writeln!(self.out, "{url}")?;
         }
 
@@ -75,27 +75,13 @@ impl<W: Write> Renderer<W> {
     }
 
     /// Wrap metadata, keeping separators from dangling at line breaks.
-    /// The source label gets the source accent; the rest stays dim.
-    fn print_metadata(&mut self, source: Source, text: &str) -> io::Result<()> {
-        let label = source.label();
-        let accent = format!("1;{}", source.accent());
-
-        for (index, line) in wrap(text, self.width).into_iter().enumerate() {
+    fn print_metadata(&mut self, text: &str) -> io::Result<()> {
+        for line in wrap(text, self.width) {
             let line = line.trim();
             let line = line.strip_prefix("· ").unwrap_or(line);
             let line = line.strip_suffix(" ·").unwrap_or(line);
-
-            let styled = if index == 0 {
-                if let Some(rest) = line.strip_prefix(label) {
-                    format!("{}{}", self.paint(&accent, label), self.paint("2", rest))
-                } else {
-                    self.paint("2", line)
-                }
-            } else {
-                self.paint("2", line)
-            };
-
-            writeln!(self.out, "{styled}")?;
+            let line = self.paint("2", line);
+            writeln!(self.out, "{line}")?;
         }
         Ok(())
     }
@@ -250,8 +236,10 @@ mod tests {
         let output = render(&[sample_story("Headline", "Text.")], true, true, true);
 
         assert!(output.contains("\x1b[1mHeadline\x1b[0m"));
-        assert!(output.contains("\x1b[1;33mHacker News\x1b[0m"));
-        assert!(output.contains("\x1b[34mhttps://example.com/story\x1b[0m"));
+        assert!(output.contains("\x1b[2mHacker News · 2h ago · 42 points · example.com\x1b[0m"));
+        assert!(output.contains("\x1b[2mhttps://example.com/story\x1b[0m"));
         assert!(output.contains("\x1b]8;;https://example.com/story\x1b\\"));
+        assert!(!output.contains("\x1b[34m"));
+        assert!(!output.contains("\x1b[1;33m"));
     }
 }

@@ -31,8 +31,7 @@ no browser.
    directly. Sources that do not (Hacker News and Lobsters) fetch the linked
    page, extract the readable content, and print a short excerpt.
 5. Output is plain text: a headline, source line, URL, and excerpt. It wraps to
-   the terminal width and stays unstyled when piped. Colors use the terminal's
-   ANSI palette, so they follow the active light or dark theme.
+   the terminal width. Headlines are bold; metadata and URLs are dimmed.
 6. One source is fetched per run. If it fails, the command fails; there is no
    aggregate mode.
 

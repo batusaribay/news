@@ -56,17 +56,6 @@ impl Source {
         }
     }
 
-    /// Standard ANSI color code for the source label.
-    pub fn accent(self) -> &'static str {
-        match self {
-            Source::Bbc => "31",
-            Source::Github => "32",
-            Source::Hn => "33",
-            Source::Lobsters => "35",
-            Source::Omarchy => "36",
-        }
-    }
-
     /// RSS/Atom feed for the source and topic.
     pub fn feed_url(self, topic: Option<&str>) -> Result<String> {
         match self {
@@ -184,17 +173,6 @@ mod tests {
         for source in Source::ALL {
             assert!(!source.description().is_empty());
             assert!(!source.name().is_empty());
-        }
-    }
-
-    #[test]
-    fn source_accents_are_distinct() {
-        let accents: Vec<_> = Source::ALL.iter().map(|source| source.accent()).collect();
-        for (index, accent) in accents.iter().enumerate() {
-            assert!(
-                !accents[..index].contains(accent),
-                "duplicate accent: {accent}"
-            );
         }
     }
 
