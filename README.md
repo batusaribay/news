@@ -1,6 +1,6 @@
-# News Reader
+# News Scraper
 
-A news reader with article text in the terminal
+A news scraper in the terminal
 
 ![Preview](preview.png)
 
@@ -41,15 +41,15 @@ no browser.
 
 | Command | Action |
 | --- | --- |
-| `news-reader` | Print help. |
-| `news-reader <source>` | Latest stories from one source. |
-| `news-reader <source> <topic>` | A topic or time range. |
-| `news-reader sources` | List sources and descriptions. |
-| `news-reader --version` | Show the version. |
+| `news-scraper` | Print help. |
+| `news-scraper <source>` | Latest stories from one source. |
+| `news-scraper <source> <topic>` | A topic or time range. |
+| `news-scraper sources` | List sources and descriptions. |
+| `news-scraper --version` | Show the version. |
 
 ### Sources and topics
 
-`news-reader sources` (or `news-reader --sources`) prints the source names and
+`news-scraper sources` (or `news-scraper --sources`) prints the source names and
 a short description of each.
 
 | Source       | Topics                                                                                                        |
@@ -65,16 +65,16 @@ The topic defaults to the source's front page or daily range.
 ### Examples
 
 ```bash
-news-reader bbc
-news-reader bbc sport
-news-reader github monthly
-news-reader hackernews ask
-news-reader lobsters rust
+news-scraper bbc
+news-scraper bbc sport
+news-scraper github monthly
+news-scraper hackernews ask
+news-scraper lobsters rust
 
-news-reader sources
-news-reader bbc -n 5
-news-reader bbc --no-links
-NO_COLOR=1 news-reader bbc
+news-scraper sources
+news-scraper bbc -n 5
+news-scraper bbc --no-links
+NO_COLOR=1 news-scraper bbc
 ```
 
 ## Installation
@@ -82,13 +82,13 @@ NO_COLOR=1 news-reader bbc
 **Requirements:** Rust 1.88+, Git, a C toolchain, and CMake for the TLS dependency.
 
 ```bash
-cargo install --git https://github.com/batusaribay/news-reader.git --locked
+cargo install --git https://github.com/batusaribay/news-scraper.git --locked
 ```
 
 ## Uninstall
 
 ```bash
-cargo uninstall news-reader
+cargo uninstall news-scraper
 ```
 
 ## Security
