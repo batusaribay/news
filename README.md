@@ -84,7 +84,7 @@ newspaper bbc --no-links
 NO_COLOR=1 newspaper bbc
 ```
 
-## Installation
+## Install
 
 **Requirements:** Rust 1.88+, Git, a C toolchain, and CMake for the TLS dependency.
 
