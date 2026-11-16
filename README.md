@@ -7,13 +7,15 @@ A newspaper in the terminal
 ## What it is
 
 A single Rust binary that prints one news source at a time: headline, source
-line, URL, and a short excerpt of the article. It covers BBC, GitHub Trending,
-Hacker News, Lobsters, and Omarchy News.
+line, URL, and the article itself — full when it can be extracted, otherwise a
+short excerpt. It covers BBC, GitHub Trending, Hacker News, Lobsters, and
+Omarchy News.
 
 ## Why this exists
 
-A headline says what happened; the first few lines say whether it matters.
-This prints both, so you can check one source and get back to work.
+A headline says what happened; the text says whether it matters. This prints
+the full article when possible and falls back to a summary, so you can read one
+source and get back to work.
 
 It is intentionally small: one source per run, no accounts, no cache, no TUI,
 no browser.
@@ -27,12 +29,15 @@ no browser.
 3. RSS is parsed locally. Source-specific metadata is added where it is useful:
    Hacker News points and comments, GitHub language and star count, and the
    linked domain for link aggregators.
-4. Sources that provide article text in the feed (BBC and Omarchy) use it
-   directly. Sources that do not (Hacker News and Lobsters) fetch the linked
-   page, extract the readable content, and print a short excerpt.
-5. Output is plain text: a headline, source line, URL, and excerpt. It wraps to
-   the terminal width. Headlines are bold; metadata and URLs are dimmed.
-6. One source is fetched per run. If it fails, the command fails; there is no
+4. By default it prints the full article text. Omarchy supplies the full article
+   in its feed; BBC, Hacker News, and Lobsters article pages are fetched and
+   extracted when needed. If extraction fails, it falls back to the short feed
+   summary.
+5. `--summary` forces the short version instead of the full article.
+6. Output is plain text: a headline, source line, URL, and article text. It
+   wraps to the terminal width. Headlines are bold; metadata and URLs are
+   dimmed.
+7. One source is fetched per run. If it fails, the command fails; there is no
    aggregate mode.
 
 ## Usage
@@ -42,8 +47,9 @@ no browser.
 | Command | Action |
 | --- | --- |
 | `newspaper` | Print help. |
-| `newspaper <source>` | Latest stories from one source. |
+| `newspaper <source>` | Latest stories from one source, with full article text. |
 | `newspaper <source> <topic>` | A topic or time range. |
+| `newspaper --summary <source>` | Print only the short summary. |
 | `newspaper sources` | List sources and descriptions. |
 | `newspaper --version` | Show the version. |
 
@@ -71,6 +77,7 @@ newspaper github monthly
 newspaper hackernews ask
 newspaper lobsters rust
 
+newspaper --summary bbc
 newspaper sources
 newspaper bbc -n 5
 newspaper bbc --no-links

@@ -37,6 +37,10 @@ struct Cli {
     #[arg(short = 'n', long, default_value_t = 8, value_name = "N", value_parser = parse_limit)]
     limit: usize,
 
+    /// Show a short summary instead of the full article
+    #[arg(long)]
+    summary: bool,
+
     /// List sources and exit
     #[arg(long)]
     sources: bool,
@@ -147,7 +151,7 @@ fn run(cli: Cli) -> Result<()> {
         .as_deref()
         .map(str::trim)
         .filter(|topic| !topic.is_empty());
-    let stories = fetch::fetch(cli.source, topic, &client, cli.limit)?;
+    let stories = fetch::fetch(cli.source, topic, &client, cli.limit, cli.summary)?;
 
     let now = Utc::now();
     let width = terminal_width();
@@ -157,7 +161,7 @@ fn run(cli: Cli) -> Result<()> {
     let printed = (|| -> io::Result<()> {
         let mut renderer = Renderer::new(&mut out, width, stdout_color, hyperlinks, !cli.no_links);
         for story in &stories {
-            renderer.print_story(cli.source, topic, story, now)?;
+            renderer.print_story(cli.source, topic, story, now, cli.summary)?;
         }
         renderer.flush()
     })();
@@ -180,6 +184,7 @@ mod tests {
         assert_eq!(cli.topic.as_deref(), Some("ask"));
         assert!(!cli.no_links);
         assert!(!cli.sources);
+        assert!(!cli.summary);
     }
 
     #[test]

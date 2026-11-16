@@ -34,6 +34,7 @@ impl<W: Write> Renderer<W> {
         topic: Option<&str>,
         story: &Story,
         now: DateTime<Utc>,
+        summary_only: bool,
     ) -> io::Result<()> {
         if self.printed {
             writeln!(self.out)?;
@@ -65,7 +66,22 @@ impl<W: Write> Renderer<W> {
             writeln!(self.out, "{url}")?;
         }
 
-        if let Some(summary) = &story.summary {
+        let full = if summary_only {
+            None
+        } else {
+            story.full.as_deref()
+        };
+
+        if let Some(paragraphs) = full.filter(|paragraphs| !paragraphs.is_empty()) {
+            for (index, paragraph) in paragraphs.iter().enumerate() {
+                if index > 0 {
+                    writeln!(self.out)?;
+                }
+                for line in wrap(paragraph, self.width) {
+                    writeln!(self.out, "{line}")?;
+                }
+            }
+        } else if let Some(summary) = &story.summary {
             for line in wrap(summary, self.width) {
                 writeln!(self.out, "{line}")?;
             }
@@ -134,6 +150,7 @@ mod tests {
             url: "https://example.com/story".to_string(),
             published: Some(Utc.with_ymd_and_hms(2026, 11, 15, 10, 0, 0).unwrap()),
             summary: Some(summary.to_string()),
+            full: None,
             details: vec!["42 points".to_string()],
             domain: Some("example.com".to_string()),
         }
@@ -145,7 +162,9 @@ mod tests {
         {
             let mut renderer = Renderer::new(&mut buffer, 60, color, hyperlinks, links);
             for story in stories {
-                renderer.print_story(Source::Hn, None, story, now).unwrap();
+                renderer
+                    .print_story(Source::Hn, None, story, now, false)
+                    .unwrap();
             }
             renderer.flush().unwrap();
         }
@@ -184,6 +203,39 @@ mod tests {
     }
 
     #[test]
+    fn prints_full_article_paragraphs_by_default() {
+        let mut story = sample_story("Headline", "Short summary.");
+        story.full = Some(vec![
+            "First paragraph.".to_string(),
+            "Second paragraph.".to_string(),
+        ]);
+
+        let output = render(&[story], false, false, true);
+        assert!(output.contains("First paragraph."));
+        assert!(output.contains("\n\nSecond paragraph."));
+        assert!(!output.contains("Short summary."));
+    }
+
+    #[test]
+    fn summary_mode_uses_the_short_summary() {
+        let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
+        let mut story = sample_story("Headline", "Short summary.");
+        story.full = Some(vec!["Full paragraph.".to_string()]);
+
+        let mut buffer = Vec::new();
+        {
+            let mut renderer = Renderer::new(&mut buffer, 60, false, false, true);
+            renderer
+                .print_story(Source::Hn, None, &story, now, true)
+                .unwrap();
+        }
+        let output = String::from_utf8(buffer).unwrap();
+
+        assert!(output.contains("Short summary."));
+        assert!(!output.contains("Full paragraph."));
+    }
+
+    #[test]
     fn prints_the_selected_topic_in_the_source_line() {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
@@ -195,6 +247,7 @@ mod tests {
                     Some("Sport"),
                     &sample_story("Headline", "Text."),
                     now,
+                    false,
                 )
                 .unwrap();
         }
@@ -209,6 +262,7 @@ mod tests {
             url: "https://apps.apple.com/app".to_string(),
             published: Some(Utc.with_ymd_and_hms(2026, 11, 15, 11, 0, 0).unwrap()),
             summary: None,
+            full: None,
             details: vec!["5 points".to_string(), "1 comment".to_string()],
             domain: Some("apps.apple.com".to_string()),
         };
@@ -217,7 +271,7 @@ mod tests {
         {
             let mut renderer = Renderer::new(&mut buffer, 34, false, false, false);
             renderer
-                .print_story(Source::Hn, None, &story, Utc::now())
+                .print_story(Source::Hn, None, &story, Utc::now(), false)
                 .unwrap();
         }
         let output = String::from_utf8(buffer).unwrap();

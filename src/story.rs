@@ -6,8 +6,10 @@ pub struct Story {
     pub title: String,
     pub url: String,
     pub published: Option<DateTime<Utc>>,
-    /// Article text or a short summary, when one is available.
+    /// Short feed summary or extracted article excerpt.
     pub summary: Option<String>,
+    /// Full article text, split into paragraphs, when extraction succeeds.
+    pub full: Option<Vec<String>>,
     /// Extra facts about a story, such as "95 points" or "412 stars today".
     pub details: Vec<String>,
     /// Site the story links to, when it is worth showing.

@@ -45,6 +45,7 @@ pub fn fetch(
     topic: Option<&str>,
     client: &Client,
     limit: usize,
+    summary_only: bool,
 ) -> Result<Vec<Story>> {
     if source == Source::Github {
         return fetch_github_trending(client, limit, topic);
@@ -54,9 +55,7 @@ pub fn fetch(
     let body = get_text(client, &url)?;
     let mut stories = parse_feed(source, &body, limit)?;
 
-    if source != Source::Github {
-        enrich_summaries(&mut stories, client);
-    }
+    enrich_articles(&mut stories, client, summary_only);
 
     Ok(stories)
 }
@@ -100,6 +99,7 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
 
     let mut details = Vec::new();
     let mut summary = None;
+    let mut full = None;
 
     match source {
         Source::Bbc | Source::Omarchy => {
@@ -107,6 +107,13 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
                 .description()
                 .and_then(|description| excerpt(description, 900))
                 .or_else(|| item.content().and_then(|content| excerpt(content, 900)));
+
+            if source == Source::Omarchy {
+                full = item.content().and_then(|content| {
+                    let paragraphs = html_to_paragraphs(content);
+                    (!paragraphs.is_empty()).then_some(paragraphs)
+                });
+            }
         }
         Source::Hn => details = hn_details(item.description().unwrap_or_default()),
         _ => {}
@@ -122,26 +129,39 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
         url,
         published: parse_date(item.pub_date()),
         summary,
+        full,
         details,
         domain,
     })
 }
 
-/// Fetch article text for stories whose feed did not include a summary.
+/// Fetch full article text, or a short excerpt in summary mode.
 /// Bounded to eight concurrent requests per source.
-fn enrich_summaries(stories: &mut [Story], client: &Client) {
+fn enrich_articles(stories: &mut [Story], client: &Client, summary_only: bool) {
     for chunk in stories.chunks_mut(8) {
         thread::scope(|scope| {
             let mut handles = Vec::new();
             for story in chunk.iter_mut() {
-                if story.summary.is_some() {
+                if summary_only {
+                    if story.summary.is_some() {
+                        continue;
+                    }
+                } else if story.full.is_some() {
                     continue;
                 }
+
                 handles.push(scope.spawn(move || {
-                    story.summary = fetch_article_summary(client, &story.url);
+                    let Some(paragraphs) = fetch_article_text(client, &story.url) else {
+                        return;
+                    };
+                    if summary_only {
+                        story.summary = excerpt(&paragraphs.join("\n\n"), 700);
+                    } else {
+                        story.full = Some(paragraphs);
+                    }
                 }));
             }
-            // A parser panic should lose one summary, not the whole source.
+            // A parser panic should lose one article, not the whole source.
             for handle in handles {
                 let _ = handle.join();
             }
@@ -149,7 +169,7 @@ fn enrich_summaries(stories: &mut [Story], client: &Client) {
     }
 }
 
-fn fetch_article_summary(client: &Client, url: &str) -> Option<String> {
+fn fetch_article_text(client: &Client, url: &str) -> Option<Vec<String>> {
     if !is_fetchable(url) || is_link_only_host(url) {
         return None;
     }
@@ -179,10 +199,22 @@ fn fetch_article_summary(client: &Client, url: &str) -> Option<String> {
     };
     let mut readability = Readability::new(html, Some(url), Some(config)).ok()?;
     let article = readability.parse().ok()?;
-    let content = html_to_text(&article.content);
-    let summary = excerpt(&content, 700)?;
+    let mut paragraphs = html_to_paragraphs(&article.content);
+    if paragraphs.is_empty() {
+        if let Some(excerpt_text) = article.excerpt.filter(|text| !text.is_empty()) {
+            paragraphs.push(clean_text(&excerpt_text));
+        } else {
+            let text = clean_text(&article.text_content);
+            if !text.is_empty() {
+                paragraphs.push(text);
+            }
+        }
+    }
+    if paragraphs.is_empty() {
+        return None;
+    }
 
-    looks_like_article(&summary).then_some(summary)
+    looks_like_article(&paragraphs.join(" ")).then_some(paragraphs)
 }
 
 /// Some servers serve gzip bytes without saying so in the headers.
@@ -208,21 +240,27 @@ fn read_limited(reader: impl Read, limit: usize) -> std::io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// Prefer paragraph text from readability's HTML so words are not glued together.
-fn html_to_text(html: &str) -> String {
+/// Extract article blocks in document order so full text keeps its paragraphs.
+fn html_to_paragraphs(html: &str) -> Vec<String> {
     let document = Html::parse_fragment(html);
-    let paragraphs = selector("p");
-    let text: Vec<String> = document
-        .select(&paragraphs)
-        .map(element_text)
-        .filter(|text| !text.is_empty())
-        .collect();
+    let blocks = selector("p, h2, h3, li, blockquote");
+    let mut paragraphs = Vec::new();
 
-    if text.is_empty() {
-        clean_text(html)
-    } else {
-        text.join(" ")
+    for block in document.select(&blocks) {
+        let text = element_text(block);
+        if !text.is_empty() && paragraphs.last() != Some(&text) {
+            paragraphs.push(text);
+        }
     }
+
+    if paragraphs.is_empty() {
+        let text = clean_text(html);
+        if !text.is_empty() {
+            paragraphs.push(text);
+        }
+    }
+
+    paragraphs
 }
 
 fn looks_like_article(text: &str) -> bool {
@@ -380,6 +418,7 @@ fn fetch_github_trending(client: &Client, limit: usize, topic: Option<&str>) -> 
                 .next()
                 .map(element_text)
                 .filter(|text| !text.is_empty()),
+            full: None,
             details,
             domain: None,
         });
@@ -516,8 +555,8 @@ mod tests {
     #[test]
     fn uses_paragraph_text_when_available() {
         assert_eq!(
-            html_to_text("<div><p>One.</p><p>Two.</p></div>"),
-            "One. Two."
+            html_to_paragraphs("<div><p>One.</p><p>Two.</p></div>"),
+            vec!["One.", "Two."]
         );
     }
 
