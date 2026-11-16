@@ -1,4 +1,4 @@
-$ newspaper lobsters -n 1
+$ news lobsters -n 1
 ## FreeBSD bhyve Live Migration: Moving VMs Between Hosts
 .. Lobsters · 2h ago · gyptazy.com
 .. https://gyptazy.com/blog/freebsd-bhyve-live-migration-support-rfc/

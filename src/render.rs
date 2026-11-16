@@ -185,7 +185,7 @@ mod tests {
         assert!(output.contains("First article text."));
         assert!(output.contains("\nSecond headline\n"));
         assert!(!output.contains("──"));
-        assert!(!output.contains("newspaper"));
+        assert!(!output.contains("news"));
         assert!(!output.contains("stories"));
         assert!(!output.contains("1."));
         assert!(!output.contains("\x1b["));

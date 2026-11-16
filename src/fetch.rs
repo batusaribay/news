@@ -23,7 +23,7 @@ const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
 pub fn client(timeout: Duration) -> Result<Client> {
     Client::builder()
         .user_agent(format!(
-            "newspaper/{} (terminal newspaper)",
+            "news/{} (terminal news)",
             env!("CARGO_PKG_VERSION")
         ))
         .timeout(timeout)

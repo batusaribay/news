@@ -1,15 +1,15 @@
 [package]
-name = "newspaper"
-version = "0.7.0"
+name = "news"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.88"
-description = "A newspaper in the terminal"
+description = "News in the terminal"
 license = "MIT"
-repository = "https://github.com/batusaribay/newspaper"
+repository = "https://github.com/batusaribay/news"
 publish = false
 
 [[bin]]
-name = "newspaper"
+name = "news"
 path = "src/main.rs"
 
 [dependencies]

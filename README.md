@@ -1,6 +1,4 @@
-# Newspaper
-
-A newspaper in the terminal
+# News
 
 ![Preview](preview.png)
 
@@ -46,16 +44,16 @@ no browser.
 
 | Command | Action |
 | --- | --- |
-| `newspaper` | Print help. |
-| `newspaper <source>` | Latest stories from one source, with full article text. |
-| `newspaper <source> <topic>` | A topic or time range. |
-| `newspaper --summary <source>` | Print only the short summary. |
-| `newspaper sources` | List sources and descriptions. |
-| `newspaper --version` | Show the version. |
+| `news` | Print help. |
+| `news <source>` | Latest stories from one source, with full article text. |
+| `news <source> <topic>` | A topic or time range. |
+| `news --summary <source>` | Print only the short summary. |
+| `news sources` | List sources and descriptions. |
+| `news --version` | Show the version. |
 
 ### Sources and topics
 
-`newspaper sources` (or `newspaper --sources`) prints the source names and
+`news sources` (or `news --sources`) prints the source names and
 a short description of each.
 
 | Source       | Topics                                                                                                        |
@@ -71,17 +69,17 @@ The topic defaults to the source's front page or daily range.
 ### Examples
 
 ```bash
-newspaper bbc
-newspaper bbc sport
-newspaper github monthly
-newspaper hackernews ask
-newspaper lobsters rust
+news bbc
+news bbc sport
+news github monthly
+news hackernews ask
+news lobsters rust
 
-newspaper --summary bbc
-newspaper sources
-newspaper bbc -n 5
-newspaper bbc --no-links
-NO_COLOR=1 newspaper bbc
+news --summary bbc
+news sources
+news bbc -n 5
+news bbc --no-links
+NO_COLOR=1 news bbc
 ```
 
 ## Install
@@ -89,13 +87,13 @@ NO_COLOR=1 newspaper bbc
 **Requirements:** Rust 1.88+, Git, a C toolchain, and CMake for the TLS dependency.
 
 ```bash
-cargo install --git https://github.com/batusaribay/newspaper.git --locked
+cargo install --git https://github.com/batusaribay/news.git --locked
 ```
 
 ## Uninstall
 
 ```bash
-cargo uninstall newspaper
+cargo uninstall news
 ```
 
 ## Security
