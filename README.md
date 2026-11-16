@@ -1,6 +1,6 @@
-# News
+# news
 
-![Preview](preview.png)
+![news in a terminal](preview.png)
 
 ## What it is
 
@@ -82,7 +82,7 @@ news bbc --no-links
 
 ## Install
 
-**Requirements:** Rust 1.88+, Git, a C toolchain, and CMake for the TLS dependency.
+**Requirements:** Rust 1.88+, `git`, a C toolchain, and CMake for the TLS dependency.
 
 ```bash
 cargo install --git https://github.com/batusaribay/news.git --locked
