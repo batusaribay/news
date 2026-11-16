@@ -10,19 +10,15 @@ use crate::story::{Story, relative_time};
 pub struct Renderer<W: Write> {
     out: W,
     width: usize,
-    color: bool,
-    hyperlinks: bool,
     links: bool,
     printed: bool,
 }
 
 impl<W: Write> Renderer<W> {
-    pub fn new(out: W, width: usize, color: bool, hyperlinks: bool, links: bool) -> Self {
+    pub fn new(out: W, width: usize, links: bool) -> Self {
         Self {
             out,
             width,
-            color,
-            hyperlinks,
             links,
             printed: false,
         }
@@ -43,8 +39,7 @@ impl<W: Write> Renderer<W> {
         }
 
         for line in wrap(&story.title, self.width) {
-            let title = self.headline(&line, &story.url);
-            writeln!(self.out, "{title}")?;
+            writeln!(self.out, "{line}")?;
         }
 
         let mut metadata = vec![source.label().to_string()];
@@ -62,7 +57,6 @@ impl<W: Write> Renderer<W> {
 
         if self.links && !story.url.is_empty() {
             let url: String = story.url.chars().filter(|ch| !ch.is_control()).collect();
-            let url = self.paint("2", &url);
             writeln!(self.out, "{url}")?;
         }
 
@@ -96,7 +90,6 @@ impl<W: Write> Renderer<W> {
             let line = line.trim();
             let line = line.strip_prefix("· ").unwrap_or(line);
             let line = line.strip_suffix(" ·").unwrap_or(line);
-            let line = self.paint("2", line);
             writeln!(self.out, "{line}")?;
         }
         Ok(())
@@ -104,24 +97,6 @@ impl<W: Write> Renderer<W> {
 
     pub fn flush(&mut self) -> io::Result<()> {
         self.out.flush()
-    }
-
-    fn headline(&self, text: &str, url: &str) -> String {
-        let styled = self.paint("1", text);
-        if self.hyperlinks && !url.is_empty() {
-            let url: String = url.chars().filter(|ch| !ch.is_control()).collect();
-            format!("\x1b]8;;{url}\x1b\\{styled}\x1b]8;;\x1b\\")
-        } else {
-            styled
-        }
-    }
-
-    fn paint(&self, code: &str, text: &str) -> String {
-        if self.color && !text.is_empty() {
-            format!("\x1b[{code}m{text}\x1b[0m")
-        } else {
-            text.to_string()
-        }
     }
 }
 
@@ -156,11 +131,11 @@ mod tests {
         }
     }
 
-    fn render(stories: &[Story], color: bool, hyperlinks: bool, links: bool) -> String {
+    fn render(stories: &[Story], links: bool) -> String {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, color, hyperlinks, links);
+            let mut renderer = Renderer::new(&mut buffer, 60, links);
             for story in stories {
                 renderer
                     .print_story(Source::Hn, None, story, now, false)
@@ -177,7 +152,7 @@ mod tests {
             sample_story("First headline", "First article text."),
             sample_story("Second headline", "Second article text."),
         ];
-        let output = render(&stories, false, false, true);
+        let output = render(&stories, true);
 
         assert!(output.starts_with("First headline\n"));
         assert!(output.contains("Hacker News · 2h ago · 42 points · example.com"));
@@ -195,10 +170,10 @@ mod tests {
     fn links_can_be_hidden() {
         let story = sample_story("Headline", "Text.");
 
-        let plain = render(std::slice::from_ref(&story), false, false, false);
+        let plain = render(std::slice::from_ref(&story), false);
         assert!(!plain.contains("https://example.com/story"));
 
-        let linked = render(&[story], false, false, true);
+        let linked = render(&[story], true);
         assert!(linked.contains("https://example.com/story"));
     }
 
@@ -210,7 +185,7 @@ mod tests {
             "Second paragraph.".to_string(),
         ]);
 
-        let output = render(&[story], false, false, true);
+        let output = render(&[story], true);
         assert!(output.contains("First paragraph."));
         assert!(output.contains("\n\nSecond paragraph."));
         assert!(!output.contains("Short summary."));
@@ -224,7 +199,7 @@ mod tests {
 
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, false, false, true);
+            let mut renderer = Renderer::new(&mut buffer, 60, true);
             renderer
                 .print_story(Source::Hn, None, &story, now, true)
                 .unwrap();
@@ -240,7 +215,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, false, false, true);
+            let mut renderer = Renderer::new(&mut buffer, 60, true);
             renderer
                 .print_story(
                     Source::Bbc,
@@ -269,7 +244,7 @@ mod tests {
 
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 34, false, false, false);
+            let mut renderer = Renderer::new(&mut buffer, 34, false);
             renderer
                 .print_story(Source::Hn, None, &story, Utc::now(), false)
                 .unwrap();
@@ -283,17 +258,5 @@ mod tests {
                 "dangling separator: {line:?}"
             );
         }
-    }
-
-    #[test]
-    fn colour_and_hyperlinks_are_opt_in_escapes() {
-        let output = render(&[sample_story("Headline", "Text.")], true, true, true);
-
-        assert!(output.contains("\x1b[1mHeadline\x1b[0m"));
-        assert!(output.contains("\x1b[2mHacker News · 2h ago · 42 points · example.com\x1b[0m"));
-        assert!(output.contains("\x1b[2mhttps://example.com/story\x1b[0m"));
-        assert!(output.contains("\x1b]8;;https://example.com/story\x1b\\"));
-        assert!(!output.contains("\x1b[34m"));
-        assert!(!output.contains("\x1b[1;33m"));
     }
 }

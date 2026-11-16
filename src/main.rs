@@ -5,7 +5,7 @@ mod story;
 
 use std::env;
 use std::ffi::OsStr;
-use std::io::{self, BufWriter, ErrorKind, IsTerminal, Write};
+use std::io::{self, BufWriter, ErrorKind, Write};
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -22,7 +22,8 @@ use crate::source::Source;
     name = "news",
     version,
     about = "News in the terminal",
-    styles = clap::builder::Styles::plain()
+    styles = clap::builder::Styles::plain(),
+    color = clap::ColorChoice::Never
 )]
 struct Cli {
     /// News source
@@ -48,10 +49,6 @@ struct Cli {
     /// Do not print article URLs
     #[arg(long)]
     no_links: bool,
-
-    /// Disable colors and hyperlinks (NO_COLOR is also respected)
-    #[arg(long)]
-    no_color: bool,
 
     /// HTTP timeout in seconds
     #[arg(long, default_value_t = 15, value_name = "SECS", value_parser = parse_timeout)]
@@ -138,12 +135,6 @@ fn finish_output(result: io::Result<()>) -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<()> {
-    let stdout_terminal = io::stdout().is_terminal();
-    let dumb_terminal = env::var("TERM").is_ok_and(|term| term == "dumb");
-    let color_allowed = !cli.no_color && env::var_os("NO_COLOR").is_none() && !dumb_terminal;
-    let stdout_color = color_allowed && stdout_terminal;
-    let hyperlinks = color_allowed && stdout_terminal && !dumb_terminal;
-
     let client = fetch::client(Duration::from_secs(cli.timeout))?;
 
     let topic = cli
@@ -159,7 +150,7 @@ fn run(cli: Cli) -> Result<()> {
     let mut out = BufWriter::new(stdout.lock());
 
     let printed = (|| -> io::Result<()> {
-        let mut renderer = Renderer::new(&mut out, width, stdout_color, hyperlinks, !cli.no_links);
+        let mut renderer = Renderer::new(&mut out, width, !cli.no_links);
         for story in &stories {
             renderer.print_story(cli.source, topic, story, now, cli.summary)?;
         }

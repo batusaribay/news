@@ -33,8 +33,7 @@ no browser.
    summary.
 5. `--summary` forces the short version instead of the full article.
 6. Output is plain text: a headline, source line, URL, and article text. It
-   wraps to the terminal width. Headlines are bold; metadata and URLs are
-   dimmed.
+   wraps to the terminal width.
 7. One source is fetched per run. If it fails, the command fails; there is no
    aggregate mode.
 
@@ -79,7 +78,6 @@ news --summary bbc
 news sources
 news bbc -n 5
 news bbc --no-links
-NO_COLOR=1 news bbc
 ```
 
 ## Install
