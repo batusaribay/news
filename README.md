@@ -1,6 +1,6 @@
-# News Scraper
+# Newspaper
 
-A news scraper in the terminal
+A newspaper in the terminal
 
 ![Preview](preview.png)
 
@@ -41,15 +41,15 @@ no browser.
 
 | Command | Action |
 | --- | --- |
-| `news-scraper` | Print help. |
-| `news-scraper <source>` | Latest stories from one source. |
-| `news-scraper <source> <topic>` | A topic or time range. |
-| `news-scraper sources` | List sources and descriptions. |
-| `news-scraper --version` | Show the version. |
+| `newspaper` | Print help. |
+| `newspaper <source>` | Latest stories from one source. |
+| `newspaper <source> <topic>` | A topic or time range. |
+| `newspaper sources` | List sources and descriptions. |
+| `newspaper --version` | Show the version. |
 
 ### Sources and topics
 
-`news-scraper sources` (or `news-scraper --sources`) prints the source names and
+`newspaper sources` (or `newspaper --sources`) prints the source names and
 a short description of each.
 
 | Source       | Topics                                                                                                        |
@@ -65,16 +65,16 @@ The topic defaults to the source's front page or daily range.
 ### Examples
 
 ```bash
-news-scraper bbc
-news-scraper bbc sport
-news-scraper github monthly
-news-scraper hackernews ask
-news-scraper lobsters rust
+newspaper bbc
+newspaper bbc sport
+newspaper github monthly
+newspaper hackernews ask
+newspaper lobsters rust
 
-news-scraper sources
-news-scraper bbc -n 5
-news-scraper bbc --no-links
-NO_COLOR=1 news-scraper bbc
+newspaper sources
+newspaper bbc -n 5
+newspaper bbc --no-links
+NO_COLOR=1 newspaper bbc
 ```
 
 ## Installation
@@ -82,13 +82,13 @@ NO_COLOR=1 news-scraper bbc
 **Requirements:** Rust 1.88+, Git, a C toolchain, and CMake for the TLS dependency.
 
 ```bash
-cargo install --git https://github.com/batusaribay/news-scraper.git --locked
+cargo install --git https://github.com/batusaribay/newspaper.git --locked
 ```
 
 ## Uninstall
 
 ```bash
-cargo uninstall news-scraper
+cargo uninstall newspaper
 ```
 
 ## Security

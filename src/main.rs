@@ -16,12 +16,12 @@ use clap::{CommandFactory, Parser};
 use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
 
-/// A news scraper in the terminal
+/// A newspaper in the terminal
 #[derive(Debug, Parser)]
 #[command(
-    name = "news-scraper",
+    name = "newspaper",
     version,
-    about = "A news scraper in the terminal",
+    about = "A newspaper in the terminal",
     styles = clap::builder::Styles::plain()
 )]
 struct Cli {
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn parses_one_source_and_topic() {
-        let cli = Cli::try_parse_from(["news-scraper", "hackernews", "ask"]).unwrap();
+        let cli = Cli::try_parse_from(["newspaper", "hackernews", "ask"]).unwrap();
         assert_eq!(cli.source, Source::Hn);
         assert_eq!(cli.topic.as_deref(), Some("ask"));
         assert!(!cli.no_links);
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn source_is_required() {
-        assert!(Cli::try_parse_from(["news-scraper"]).is_err());
+        assert!(Cli::try_parse_from(["newspaper"]).is_err());
     }
 
     #[test]
