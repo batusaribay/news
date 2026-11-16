@@ -1,22 +1,8 @@
 # news
 
+A terminal news reader with full articles.
+
 ![news in a terminal](preview.png)
-
-## What it is
-
-A single Rust binary that prints one news source at a time: headline, source
-line, URL, and the article itself — full when it can be extracted, otherwise a
-short excerpt. It covers BBC, GitHub Trending, Hacker News, Lobsters, and
-Omarchy News.
-
-## Why this exists
-
-A headline says what happened; the text says whether it matters. This prints
-the full article when possible and falls back to a summary, so you can read one
-source and get back to work.
-
-It is intentionally small: one source per run, no accounts, no cache, no TUI,
-no browser.
 
 ## How it works
 

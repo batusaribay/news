@@ -16,12 +16,12 @@ use clap::{CommandFactory, Parser};
 use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
 
-/// News in the terminal
+/// A terminal news reader with full articles
 #[derive(Debug, Parser)]
 #[command(
     name = "news",
     version,
-    about = "News in the terminal",
+    about = "A terminal news reader with full articles",
     styles = clap::builder::Styles::plain(),
     color = clap::ColorChoice::Never
 )]
