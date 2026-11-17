@@ -1,6 +1,6 @@
 # news
 
-A Rust CLI newspaper with full articles
+A Rust CLI to read full news articles
 
 ![news in a terminal](preview.png)
 
