@@ -16,12 +16,12 @@ use clap::{CommandFactory, Parser};
 use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
 
-/// A Rust CLI news reader with full articles
+/// A Rust CLI newspaper with full articles
 #[derive(Debug, Parser)]
 #[command(
     name = "news",
     version,
-    about = "A Rust CLI news reader with full articles",
+    about = "A Rust CLI newspaper with full articles",
     styles = clap::builder::Styles::plain(),
     color = clap::ColorChoice::Never
 )]
