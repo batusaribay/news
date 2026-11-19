@@ -1,5 +1,6 @@
 use std::io::Read;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -28,6 +29,11 @@ pub fn client(timeout: Duration) -> Result<Client> {
         ))
         .timeout(timeout)
         .connect_timeout(Duration::from_secs(5))
+        // Checking the URL host is not enough: an attacker-controlled feed can
+        // point a public-looking name at a private address (DNS rebinding).
+        // Resolve once here and drop every non-public address before reqwest
+        // connects.
+        .dns_resolver(Arc::new(PublicResolver))
         .redirect(Policy::custom(|attempt| {
             if attempt.previous().len() >= 8 || !is_fetchable(attempt.url().as_str()) {
                 attempt.stop()
@@ -37,6 +43,25 @@ pub fn client(timeout: Duration) -> Result<Client> {
         }))
         .build()
         .context("could not initialise the HTTP client")
+}
+
+/// A resolver that only returns publicly routable addresses.
+struct PublicResolver;
+
+impl reqwest::dns::Resolve for PublicResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let addrs: Vec<SocketAddr> = (host.as_str(), 0)
+                .to_socket_addrs()?
+                .filter(|addr| is_public_ip(addr.ip()))
+                .collect();
+            if addrs.is_empty() {
+                return Err(format!("{host} resolves only to non-public addresses").into());
+            }
+            Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+        })
+    }
 }
 
 /// Fetch the selected source and topic.
@@ -340,23 +365,31 @@ fn is_fetchable(url: &str) -> bool {
 fn is_public_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ip) => {
+            let octets = ip.octets();
             !(ip.is_private()
                 || ip.is_loopback()
                 || ip.is_link_local()
                 || ip.is_broadcast()
                 || ip.is_documentation()
                 || ip.is_unspecified()
-                || ip.is_multicast())
+                || ip.is_multicast()
+                // Carrier-grade NAT, benchmarking, reserved, and 192.0.0.0/24.
+                || (octets[0] == 100 && (64..=127).contains(&octets[1]))
+                || (octets[0] == 198 && matches!(octets[1], 18 | 19))
+                || octets[0] >= 240
+                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0))
         }
         IpAddr::V6(ip) => {
             if let Some(ip) = ip.to_ipv4_mapped() {
                 return is_public_ip(IpAddr::V4(ip));
             }
+            let segments = ip.segments();
             !(ip.is_loopback()
                 || ip.is_unspecified()
                 || ip.is_multicast()
                 || ip.is_unique_local()
-                || ip.is_unicast_link_local())
+                || ip.is_unicast_link_local()
+                || (segments[0] == 0x2001 && segments[1] == 0x0db8))
         }
     }
 }
@@ -387,7 +420,10 @@ fn fetch_github_trending(client: &Client, limit: usize, topic: Option<&str>) -> 
             .next()
             .unwrap_or(href)
             .trim()
-            .trim_matches('/');
+            .trim_matches('/')
+            .chars()
+            .filter(|character| !character.is_control())
+            .collect::<String>();
         if repo.is_empty() {
             continue;
         }
@@ -550,6 +586,10 @@ mod tests {
         assert!(!is_fetchable("http://[::ffff:127.0.0.1]/admin"));
         assert!(!is_fetchable("http://169.254.169.254/latest/meta-data/"));
         assert!(!is_fetchable("http://printer.local/admin"));
+        assert!(!is_fetchable("http://100.64.0.1/"));
+        assert!(!is_fetchable("http://198.18.0.1/"));
+        assert!(!is_fetchable("http://240.0.0.1/"));
+        assert!(!is_fetchable("http://[2001:db8::1]/"));
     }
 
     #[test]

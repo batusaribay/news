@@ -114,8 +114,11 @@ pub fn excerpt(input: &str, max_chars: usize) -> Option<String> {
     let sentence_end = cut.rfind(['.', '!', '?']);
 
     let body = match sentence_end {
-        // Only use a sentence boundary if it is not too close to the start.
-        Some(position) if position * 10 >= max_chars * 6 => cut[..=position].trim_end(),
+        // `position` is a byte offset, so compare character counts instead of
+        // mixing bytes with `max_chars`.
+        Some(position) if cut[..=position].chars().count() * 10 >= max_chars * 6 => {
+            cut[..=position].trim_end()
+        }
         _ => {
             let boundary = cut.rfind(char::is_whitespace).unwrap_or(cut.len());
             cut[..boundary].trim_end()
