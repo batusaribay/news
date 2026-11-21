@@ -42,6 +42,7 @@ Options:
       --json            Print JSON instead of formatted text
       --sources         List sources and exit
       --no-links        Do not print article URLs
+      --color <WHEN>    Color output: auto, always, or never [default: auto]
       --timeout <SECS>  HTTP timeout in seconds (default: 15)
   -h, --help            Print help
   -V, --version         Print version
@@ -76,6 +77,11 @@ characters are stripped from feed text, scraped text, hosts, and URLs.
 
 No credentials are read, no configuration is written, and no telemetry is sent.
 Unsafe code is forbidden by the package lint configuration.
+
+Color uses the terminal palette and ANSI attributes only. Article text inherits
+the terminal foreground, while headlines and metadata use semantic roles.
+`--color never`, `NO_COLOR`, `CLICOLOR=0`, `TERM=dumb`, and non-terminal output
+all disable it. JSON is never colored.
 
 ## Install
 

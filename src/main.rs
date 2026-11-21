@@ -2,6 +2,7 @@ mod fetch;
 mod render;
 mod source;
 mod story;
+mod theme;
 
 use std::env;
 use std::ffi::OsStr;
@@ -15,6 +16,7 @@ use clap::{CommandFactory, Parser};
 
 use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
+use crate::theme::{ColorMode, Theme};
 
 /// A Rust CLI to read full news articles
 #[derive(Debug, Parser)]
@@ -57,6 +59,10 @@ struct Cli {
     /// HTTP timeout in seconds
     #[arg(long, default_value_t = 15, value_name = "SECS", value_parser = parse_timeout)]
     timeout: u64,
+
+    /// Color output: auto, always, or never
+    #[arg(long, value_enum, default_value = "auto", value_name = "WHEN")]
+    color: ColorMode,
 }
 
 fn parse_limit(value: &str) -> std::result::Result<usize, String> {
@@ -202,7 +208,8 @@ fn run(cli: Cli) -> Result<()> {
     }
 
     let printed = (|| -> io::Result<()> {
-        let mut renderer = Renderer::new(&mut out, width, !cli.no_links);
+        let theme = Theme::from_env(cli.color);
+        let mut renderer = Renderer::new(&mut out, width, !cli.no_links, theme);
         for story in &stories {
             renderer.print_story(cli.source, topic, story, now, cli.summary)?;
         }

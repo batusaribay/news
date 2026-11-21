@@ -5,21 +5,24 @@ use textwrap::wrap;
 
 use crate::source::Source;
 use crate::story::{Story, relative_time};
+use crate::theme::{Role, Theme};
 
 /// A plain-text digest. No banners, rules, numbering, or footers.
 pub struct Renderer<W: Write> {
     out: W,
     width: usize,
     links: bool,
+    theme: Theme,
     printed: bool,
 }
 
 impl<W: Write> Renderer<W> {
-    pub fn new(out: W, width: usize, links: bool) -> Self {
+    pub fn new(out: W, width: usize, links: bool, theme: Theme) -> Self {
         Self {
             out,
             width,
             links,
+            theme,
             printed: false,
         }
     }
@@ -39,7 +42,7 @@ impl<W: Write> Renderer<W> {
         }
 
         for line in wrap(&story.title, self.width) {
-            writeln!(self.out, "{line}")?;
+            writeln!(self.out, "{}", self.theme.paint(Role::Heading, &line))?;
         }
 
         let mut metadata = vec![source.label().to_string()];
@@ -57,7 +60,7 @@ impl<W: Write> Renderer<W> {
 
         if self.links && !story.url.is_empty() {
             let url: String = story.url.chars().filter(|ch| !ch.is_control()).collect();
-            writeln!(self.out, "{url}")?;
+            writeln!(self.out, "{}", self.theme.paint(Role::Muted, &url))?;
         }
 
         let full = if summary_only {
@@ -90,7 +93,7 @@ impl<W: Write> Renderer<W> {
             let line = line.trim();
             let line = line.strip_prefix("· ").unwrap_or(line);
             let line = line.strip_suffix(" ·").unwrap_or(line);
-            writeln!(self.out, "{line}")?;
+            writeln!(self.out, "{}", self.theme.paint(Role::Muted, line))?;
         }
         Ok(())
     }
@@ -135,7 +138,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, links);
+            let mut renderer = Renderer::new(&mut buffer, 60, links, Theme::plain());
             for story in stories {
                 renderer
                     .print_story(Source::Hn, None, story, now, false)
@@ -199,7 +202,7 @@ mod tests {
 
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, true);
+            let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain());
             renderer
                 .print_story(Source::Hn, None, &story, now, true)
                 .unwrap();
@@ -215,7 +218,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, true);
+            let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain());
             renderer
                 .print_story(
                     Source::Bbc,
@@ -244,7 +247,7 @@ mod tests {
 
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 34, false);
+            let mut renderer = Renderer::new(&mut buffer, 34, false, Theme::plain());
             renderer
                 .print_story(Source::Hn, None, &story, Utc::now(), false)
                 .unwrap();
