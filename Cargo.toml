@@ -21,6 +21,7 @@ flate2 = "1"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 rss = "2.1"
 scraper = "0.29"
+serde_json = "1"
 terminal_size = "0.4"
 textwrap = "0.16"
 

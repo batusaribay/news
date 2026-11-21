@@ -50,6 +50,10 @@ struct Cli {
     #[arg(long)]
     no_links: bool,
 
+    /// Print JSON instead of formatted text
+    #[arg(long)]
+    json: bool,
+
     /// HTTP timeout in seconds
     #[arg(long, default_value_t = 15, value_name = "SECS", value_parser = parse_timeout)]
     timeout: u64,
@@ -87,12 +91,15 @@ fn main() -> ExitCode {
         .iter()
         .any(|arg| arg.as_os_str() == OsStr::new("--sources"));
     if args[0].as_os_str() == OsStr::new("sources") || wants_sources {
-        return print_sources();
+        let json = args
+            .iter()
+            .any(|arg| arg.as_os_str() == OsStr::new("--json"));
+        return print_sources(json);
     }
 
     let cli = Cli::parse();
     if cli.sources {
-        return print_sources();
+        return print_sources(cli.json);
     }
 
     match run(cli) {
@@ -110,12 +117,26 @@ fn print_help() -> ExitCode {
     finish_output(result)
 }
 
-fn print_sources() -> ExitCode {
+fn print_sources(json: bool) -> ExitCode {
     let stdout = io::stdout();
     let mut out = BufWriter::new(stdout.lock());
     let result = (|| -> io::Result<()> {
-        for source in Source::ALL {
-            writeln!(out, "{:<11} {}", source.name(), source.description())?;
+        if json {
+            let sources: Vec<_> = Source::ALL
+                .iter()
+                .map(|source| {
+                    serde_json::json!({
+                        "name": source.name(),
+                        "description": source.description(),
+                    })
+                })
+                .collect();
+            serde_json::to_writer_pretty(&mut out, &sources).map_err(io::Error::other)?;
+            writeln!(out)?;
+        } else {
+            for source in Source::ALL {
+                writeln!(out, "{:<11} {}", source.name(), source.description())?;
+            }
         }
         out.flush()
     })();
@@ -148,6 +169,37 @@ fn run(cli: Cli) -> Result<()> {
     let width = terminal_width();
     let stdout = io::stdout();
     let mut out = BufWriter::new(stdout.lock());
+
+    if cli.json {
+        let stories: Vec<_> = stories
+            .iter()
+            .map(|story| {
+                serde_json::json!({
+                    "title": story.title,
+                    "url": story.url,
+                    "published": story.published.map(|date| date.to_rfc3339()),
+                    "summary": story.summary,
+                    "details": story.details,
+                    "domain": story.domain,
+                    "full": story.full,
+                })
+            })
+            .collect();
+        let value = serde_json::json!({
+            "source": cli.source.name(),
+            "topic": topic,
+            "stories": stories,
+        });
+        let printed = serde_json::to_writer_pretty(&mut out, &value)
+            .map_err(io::Error::other)
+            .and_then(|()| writeln!(out))
+            .and_then(|()| out.flush());
+        return match printed {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::BrokenPipe => Ok(()),
+            Err(error) => Err(error).context("could not write output"),
+        };
+    }
 
     let printed = (|| -> io::Result<()> {
         let mut renderer = Renderer::new(&mut out, width, !cli.no_links);
