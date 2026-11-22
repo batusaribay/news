@@ -48,8 +48,6 @@ Options:
   -V, --version         Print version
 ```
 
-Typical calls:
-
 ```bash
 news bbc
 news bbc sport
