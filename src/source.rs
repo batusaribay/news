@@ -14,16 +14,19 @@ pub enum Source {
     Lobsters,
     #[value(name = "omarchy")]
     Omarchy,
+    #[value(name = "omarchy-releases")]
+    OmarchyReleases,
 }
 
 impl Source {
     /// Sources in the order shown by the `sources` command and help.
-    pub const ALL: [Source; 5] = [
+    pub const ALL: [Source; 6] = [
         Source::Bbc,
         Source::Github,
         Source::Hn,
         Source::Lobsters,
         Source::Omarchy,
+        Source::OmarchyReleases,
     ];
 
     pub fn name(self) -> &'static str {
@@ -33,6 +36,7 @@ impl Source {
             Source::Hn => "hackernews",
             Source::Lobsters => "lobsters",
             Source::Omarchy => "omarchy",
+            Source::OmarchyReleases => "omarchy-releases",
         }
     }
 
@@ -43,6 +47,7 @@ impl Source {
             Source::Hn => "Hacker News",
             Source::Lobsters => "Lobsters",
             Source::Omarchy => "Omarchy News",
+            Source::OmarchyReleases => "Omarchy Releases",
         }
     }
 
@@ -53,6 +58,7 @@ impl Source {
             Source::Hn => "Technology and startup discussion.",
             Source::Lobsters => "Computing and technology links from the community.",
             Source::Omarchy => "Release notes and news from Omarchy.",
+            Source::OmarchyReleases => "Latest releases from the Omarchy repository.",
         }
     }
 
@@ -69,6 +75,7 @@ impl Source {
                 Ok("https://omarchy.org/news/rss.xml".to_string())
             }
             Source::Github => bail!("GitHub Trending is not an RSS source"),
+            Source::OmarchyReleases => bail!("Omarchy Releases uses the GitHub API"),
         }
     }
 }
@@ -194,6 +201,7 @@ mod tests {
             Source::Omarchy.feed_url(None).unwrap(),
             "https://omarchy.org/news/rss.xml"
         );
+        assert!(Source::OmarchyReleases.feed_url(None).is_err());
     }
 
     #[test]
@@ -221,6 +229,7 @@ mod tests {
         assert!(Source::Bbc.feed_url(Some("gossip")).is_err());
         assert!(Source::Hn.feed_url(Some("gossip")).is_err());
         assert!(Source::Omarchy.feed_url(Some("sport")).is_err());
+        assert!(Source::OmarchyReleases.feed_url(Some("sport")).is_err());
         assert!(Source::Lobsters.feed_url(Some("rust lang")).is_err());
         assert!(github_trending_url(Some("yearly")).is_err());
     }

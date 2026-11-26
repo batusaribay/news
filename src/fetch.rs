@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{self, Read};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread;
@@ -12,6 +12,7 @@ use reqwest::header::CONTENT_TYPE;
 use reqwest::redirect::Policy;
 use rss::{Channel, Item};
 use scraper::{ElementRef, Html, Selector};
+use serde_json::Value;
 
 use crate::source::{Source, github_trending_url};
 use crate::story::{Story, clean_text, excerpt, hn_details, host_of, parse_date};
@@ -74,6 +75,12 @@ pub fn fetch(
 ) -> Result<Vec<Story>> {
     if source == Source::Github {
         return fetch_github_trending(client, limit, topic);
+    }
+    if source == Source::OmarchyReleases {
+        if topic.is_some() {
+            bail!("Omarchy Releases has no topics");
+        }
+        return fetch_omarchy_releases(client, limit, summary_only);
     }
 
     let url = source.feed_url(topic)?;
@@ -141,7 +148,7 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
             }
         }
         Source::Hn => details = hn_details(item.description().unwrap_or_default()),
-        _ => {}
+        Source::Lobsters | Source::Github | Source::OmarchyReleases => {}
     }
 
     let domain = match source {
@@ -158,6 +165,125 @@ fn story_from_item(source: Source, item: &Item) -> Option<Story> {
         details,
         domain,
     })
+}
+
+fn fetch_omarchy_releases(client: &Client, limit: usize, summary_only: bool) -> Result<Vec<Story>> {
+    const URL: &str = "https://api.github.com/repos/omacom/omarchy/releases?per_page=100";
+    let body = get_text(client, URL)?;
+    let releases: Value =
+        serde_json::from_str(&body).context("could not parse the Omarchy releases")?;
+    let mut stories = parse_omarchy_releases(&releases, limit, summary_only)?;
+    enrich_articles(&mut stories, client, summary_only);
+    Ok(stories)
+}
+
+fn parse_omarchy_releases(value: &Value, limit: usize, summary_only: bool) -> Result<Vec<Story>> {
+    let releases = value
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("GitHub returned an unexpected releases response"))?;
+    let stories: Vec<Story> = releases
+        .iter()
+        .filter(|release| release["draft"].as_bool() != Some(true))
+        .filter_map(|release| {
+            let tag = release["tag_name"].as_str()?.trim();
+            if tag.is_empty() {
+                return None;
+            }
+            let name = release["name"]
+                .as_str()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(tag);
+            let url = release["html_url"].as_str()?.trim();
+            if !is_fetchable(url) {
+                return None;
+            }
+            let body = release["body"].as_str().unwrap_or_default();
+            let text = markdown_text(body);
+            let summary = excerpt(&text, 900);
+            let full = (!summary_only)
+                .then(|| markdown_paragraphs(body))
+                .filter(|paragraphs| !paragraphs.is_empty());
+            let mut details = vec![format!("tag {tag}")];
+            if release["prerelease"].as_bool() == Some(true) {
+                details.push("prerelease".to_string());
+            }
+            Some(Story {
+                title: clean_text(name),
+                url: url.to_string(),
+                published: crate::story::parse_date(release["published_at"].as_str()),
+                summary,
+                full,
+                details,
+                domain: None,
+            })
+        })
+        .take(limit)
+        .collect();
+
+    if stories.is_empty() {
+        bail!("GitHub returned no readable Omarchy releases");
+    }
+    Ok(stories)
+}
+
+fn markdown_paragraphs(body: &str) -> Vec<String> {
+    body.split("\n\n")
+        .map(markdown_text)
+        .filter(|paragraph| !paragraph.is_empty())
+        .collect()
+}
+
+fn markdown_text(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let chars: Vec<char> = input.chars().collect();
+    let mut index = 0;
+    while index < chars.len() {
+        match chars[index] {
+            '!' if chars.get(index + 1) == Some(&'[') => {
+                // Images add nothing to terminal release notes.
+                index += 2;
+                if let Some(end) = chars[index..].iter().position(|ch| *ch == ']') {
+                    index += end + 1;
+                    if chars.get(index) == Some(&'(')
+                        && let Some(url_end) = chars[index + 1..].iter().position(|ch| *ch == ')')
+                    {
+                        index += url_end + 2;
+                    }
+                }
+            }
+            '[' => {
+                if let Some(label_end) = chars[index + 1..].iter().position(|ch| *ch == ']') {
+                    let label_end = index + 1 + label_end;
+                    if chars.get(label_end + 1) == Some(&'(')
+                        && let Some(url_end) =
+                            chars[label_end + 2..].iter().position(|ch| *ch == ')')
+                    {
+                        let url_end = label_end + 2 + url_end;
+                        let label: String = chars[index + 1..label_end].iter().collect();
+                        let url: String = chars[label_end + 2..url_end].iter().collect();
+                        output.push_str(&label);
+                        if url.starts_with("http") && url != label {
+                            output.push_str(&format!(" ({url})"));
+                        }
+                        index = url_end + 1;
+                        continue;
+                    }
+                }
+                output.push(chars[index]);
+            }
+            '`' | '*' => {}
+            _ => output.push(chars[index]),
+        }
+        index += 1;
+    }
+
+    let lines: Vec<&str> = output
+        .lines()
+        .map(|line| line.trim().trim_start_matches(['#', '-', '+']).trim())
+        .filter(|line| !line.is_empty())
+        .collect();
+    clean_text(&lines.join(" "))
 }
 
 /// Fetch full article text, or a short excerpt in summary mode.
@@ -247,8 +373,11 @@ fn decode_body(bytes: &[u8]) -> Option<String> {
     let mut data = Vec::new();
 
     if bytes.starts_with(&[0x1f, 0x8b]) {
-        let mut decoder = GzDecoder::new(bytes).take(MAX_DECODED_BYTES as u64);
-        if decoder.read_to_end(&mut data).is_err() && data.is_empty() {
+        let mut decoder = GzDecoder::new(bytes).take(MAX_DECODED_BYTES as u64 + 1);
+        if decoder.read_to_end(&mut data).is_err() {
+            return None;
+        }
+        if data.len() > MAX_DECODED_BYTES {
             return None;
         }
     } else {
@@ -258,10 +387,16 @@ fn decode_body(bytes: &[u8]) -> Option<String> {
     Some(String::from_utf8_lossy(&data).into_owned())
 }
 
-fn read_limited(reader: impl Read, limit: usize) -> std::io::Result<Vec<u8>> {
-    let mut limited = reader.take(limit as u64);
+fn read_limited(reader: impl Read, limit: usize) -> io::Result<Vec<u8>> {
+    let mut limited = reader.take(limit as u64 + 1);
     let mut bytes = Vec::new();
     limited.read_to_end(&mut bytes)?;
+    if bytes.len() > limit {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("response exceeds the {limit}-byte limit"),
+        ));
+    }
     Ok(bytes)
 }
 
@@ -339,16 +474,23 @@ fn is_link_only_host(url: &str) -> bool {
 
 /// Only fetch public HTTP(S) URLs; never local services or local files.
 fn is_fetchable(url: &str) -> bool {
-    let lower = url.to_ascii_lowercase();
-    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
+    if !matches!(parsed.scheme(), "https" | "http") {
         return false;
     }
 
-    let Some(host) = host_of(url) else {
+    let Some(host) = parsed.host_str() else {
         return false;
     };
-    let host = host.trim_end_matches('.').to_ascii_lowercase();
-    if host == "localhost"
+    let host = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if host.is_empty()
+        || host == "localhost"
         || host.ends_with(".localhost")
         || host.ends_with(".local")
         || host.ends_with(".internal")
@@ -373,23 +515,30 @@ fn is_public_ip(ip: IpAddr) -> bool {
                 || ip.is_documentation()
                 || ip.is_unspecified()
                 || ip.is_multicast()
-                // Carrier-grade NAT, benchmarking, reserved, and 192.0.0.0/24.
+                // Current and former special-purpose, non-public ranges.
+                || octets[0] == 0
                 || (octets[0] == 100 && (64..=127).contains(&octets[1]))
+                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
+                || (octets[0] == 192 && octets[1] == 88 && octets[2] == 99)
                 || (octets[0] == 198 && matches!(octets[1], 18 | 19))
-                || octets[0] >= 240
-                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0))
+                || octets[0] >= 240)
         }
         IpAddr::V6(ip) => {
-            if let Some(ip) = ip.to_ipv4_mapped() {
+            if let Some(ip) = ip.to_ipv4() {
                 return is_public_ip(IpAddr::V4(ip));
             }
             let segments = ip.segments();
-            !(ip.is_loopback()
-                || ip.is_unspecified()
-                || ip.is_multicast()
-                || ip.is_unique_local()
-                || ip.is_unicast_link_local()
-                || (segments[0] == 0x2001 && segments[1] == 0x0db8))
+            // Globally routable unicast currently lives in 2000::/3. Exclude
+            // documentation, benchmarking, and transition mechanisms within it.
+            (segments[0] & 0xe000) == 0x2000
+                && !(ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_multicast()
+                    || ip.is_unique_local()
+                    || ip.is_unicast_link_local()
+                    || (segments[0] == 0x2001 && (segments[1] <= 0x01ff || segments[1] == 0x0db8))
+                    || segments[0] == 0x2002
+                    || (segments[0] == 0x3fff && (segments[1] & 0xf000) == 0))
         }
     }
 }
@@ -487,6 +636,9 @@ fn element_text(element: ElementRef<'_>) -> String {
 }
 
 fn get_text(client: &Client, url: &str) -> Result<String> {
+    if !is_fetchable(url) {
+        bail!("refusing to fetch a non-public URL: {url}");
+    }
     let response = client
         .get(url)
         .send()
@@ -498,7 +650,7 @@ fn get_text(client: &Client, url: &str) -> Result<String> {
 
     let bytes = read_limited(response, MAX_FEED_BYTES)
         .with_context(|| format!("could not read the response from {url}"))?;
-    Ok(String::from_utf8_lossy(&bytes).into_owned())
+    decode_body(&bytes).with_context(|| format!("could not decode the response from {url}"))
 }
 
 #[cfg(test)]
@@ -550,6 +702,7 @@ mod tests {
             decode_body(&compressed).as_deref(),
             Some("<html>hello</html>")
         );
+        assert_eq!(decode_body(&compressed[..compressed.len() - 2]), None);
     }
 
     #[test]
@@ -568,9 +721,44 @@ mod tests {
     }
 
     #[test]
+    fn parses_omarchy_releases_and_skips_drafts() {
+        let value = serde_json::json!([
+            {
+                "tag_name": "v4.5.0",
+                "name": "Omarchy 4.5",
+                "html_url": "https://github.com/omacom/omarchy/releases/tag/v4.5.0",
+                "published_at": "2026-11-05T05:36:53Z",
+                "body": "First **paragraph** with [a link](https://example.com).\n\n## Second\n\n- Last",
+                "draft": false,
+                "prerelease": false
+            },
+            {
+                "tag_name": "draft",
+                "name": "Draft",
+                "html_url": "https://github.com/omacom/omarchy/releases/tag/draft",
+                "draft": true
+            }
+        ]);
+        let stories = parse_omarchy_releases(&value, 8, false).unwrap();
+        assert_eq!(stories.len(), 1);
+        assert_eq!(stories[0].title, "Omarchy 4.5");
+        assert_eq!(stories[0].details, vec!["tag v4.5.0"]);
+        assert_eq!(
+            stories[0].full.as_ref().unwrap(),
+            &[
+                "First paragraph with a link (https://example.com).",
+                "Second",
+                "Last"
+            ]
+        );
+        assert!(parse_omarchy_releases(&serde_json::json!([]), 8, false).is_err());
+    }
+
+    #[test]
     fn bounds_response_reads() {
-        let bytes = read_limited(&b"abcdefghij"[..], 4).unwrap();
+        let bytes = read_limited(&b"abcd"[..], 4).unwrap();
         assert_eq!(bytes, b"abcd");
+        assert!(read_limited(&b"abcde"[..], 4).is_err());
     }
 
     #[test]
@@ -590,6 +778,19 @@ mod tests {
         assert!(!is_fetchable("http://198.18.0.1/"));
         assert!(!is_fetchable("http://240.0.0.1/"));
         assert!(!is_fetchable("http://[2001:db8::1]/"));
+        assert!(!is_fetchable("http://0.0.0.1/"));
+        assert!(!is_fetchable("http://192.88.99.1/"));
+        assert!(!is_fetchable("http://2130706433/"));
+        assert!(!is_fetchable("http://0x7f000001/"));
+        assert!(!is_fetchable("http://127.0.0.1\\@example.com/"));
+        assert!(!is_fetchable("http://[::127.0.0.1]/"));
+        assert!(!is_fetchable("http://[64:ff9b::127.0.0.1]/"));
+        assert!(!is_fetchable("http://[fec0::1]/"));
+        assert!(!is_fetchable("http://[2001:2::1]/"));
+        assert!(!is_fetchable("http://[2002:7f00:1::]/"));
+        assert!(is_fetchable("https://8.8.8.8/"));
+        assert!(is_fetchable("https://[2606:4700:4700::1111]/"));
+        assert!(is_fetchable("http://example.com\\@127.0.0.1/"));
     }
 
     #[test]

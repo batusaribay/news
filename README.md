@@ -1,6 +1,6 @@
 # news
 
-A Rust CLI to read full news articles
+A Rust CLI to read news articles
 
 ![news in a terminal](preview.png)
 
@@ -12,12 +12,13 @@ terminal with nothing else around it.
 
 ## How it works
 
-The selected source and topic choose an RSS feed, or GitHub's trending page
-when the source is `github`. One HTTP client fetches the feed with TLS
-verification, timeouts, redirect limits, and response size caps. RSS is parsed
-locally, and source-specific metadata is added where it matters: Hacker News
-points and comments, GitHub language and star count, and the linked domain for
-aggregators.
+The selected source and topic choose an RSS feed, GitHub's trending page when
+the source is `github`, or the GitHub releases API when it is
+`omarchy-releases`. One HTTP client fetches the feed with TLS verification,
+timeouts, redirect limits, and response size caps. Feeds and release notes are
+parsed locally, and source-specific metadata is added where it matters: Hacker
+News points and comments, GitHub language and star count, release tags, and the
+linked domain for aggregators.
 
 By default it prints the full article text. Omarchy supplies the full article
 in its feed; BBC, Hacker News, and Lobsters pages are fetched and extracted when
@@ -30,10 +31,11 @@ aggregate mode.
 ## Usage
 
 ```text
-news [OPTIONS] <SOURCE> [TOPIC]
+news [OPTIONS] [SOURCE] [TOPIC]
 
 Arguments:
-  <SOURCE>  News source [bbc, github, hackernews, lobsters, omarchy]
+  [SOURCE]  News source [bbc, github, hackernews, lobsters, omarchy,
+            omarchy-releases]
   [TOPIC]   Topic or time range for the source
 
 Options:
@@ -55,31 +57,20 @@ news github monthly
 news hackernews ask
 news --summary bbc
 news --json bbc -n 5
+news omarchy-releases
 news sources
 ```
 
 ## Notes
 
-BBC topics are `top`, `world`, `uk`, `business`, `politics`, `health`,
-`education`, `science`, `technology`, `entertainment`, `sport`, and `football`.
-GitHub takes `daily`, `weekly`, or `monthly`. Hacker News takes `frontpage`,
-`newest`, `ask`, `show`, `jobs`, or `best`. Lobsters takes any tag, such as
-`rust`, `linux`, `security`, or `programming`. Omarchy has no topics. The
-default topic is the source's front page or daily range.
+The default topic is each source's front page or daily range. BBC, GitHub,
+Hacker News, and Lobsters accept their usual topic or time-range names;
+`omarchy` and `omarchy-releases` have no topics.
 
-TLS is verified by `rustls`. Only public HTTP(S) pages are fetched; localhost,
-private, loopback, link-local, and cloud metadata addresses are skipped, and
-redirects follow the same rules. Responses are capped at 4 MiB, decompressed
-pages at 8 MiB, and timeouts and redirects are bounded. Terminal control
-characters are stripped from feed text, scraped text, hosts, and URLs.
+## Config
 
-No credentials are read, no configuration is written, and no telemetry is sent.
-Unsafe code is forbidden by the package lint configuration.
-
-Color uses the terminal palette and ANSI attributes only. Article text inherits
-the terminal foreground, while headlines and metadata use semantic roles.
-`--color never`, `NO_COLOR`, `CLICOLOR=0`, `TERM=dumb`, and non-terminal output
-all disable it. JSON is never colored.
+Reads `~/.config/news/config.toml` if present. Flags override the file;
+defaults apply otherwise.
 
 ## Install
 

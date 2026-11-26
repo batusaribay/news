@@ -1,3 +1,4 @@
+mod config;
 mod fetch;
 mod render;
 mod source;
@@ -5,7 +6,7 @@ mod story;
 mod theme;
 
 use std::env;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::io::{self, BufWriter, ErrorKind, Write};
 use std::process::ExitCode;
 use std::time::Duration;
@@ -18,27 +19,27 @@ use crate::render::{Renderer, terminal_width};
 use crate::source::Source;
 use crate::theme::{ColorMode, Theme};
 
-/// A Rust CLI to read full news articles
+/// A Rust CLI to read news articles
 #[derive(Debug, Parser)]
 #[command(
     name = "news",
     version,
-    about = "A Rust CLI to read full news articles",
+    about = "A Rust CLI to read news articles",
     styles = clap::builder::Styles::plain(),
     color = clap::ColorChoice::Never
 )]
 struct Cli {
     /// News source
-    #[arg(value_enum, value_name = "SOURCE")]
-    source: Source,
+    #[arg(value_enum, value_name = "SOURCE", required_unless_present = "sources")]
+    source: Option<Source>,
 
     /// Topic or time range for the source (e.g. sport, ask, monthly)
     #[arg(value_name = "TOPIC")]
     topic: Option<String>,
 
-    /// Number of stories
-    #[arg(short = 'n', long, default_value_t = 8, value_name = "N", value_parser = parse_limit)]
-    limit: usize,
+    /// Number of stories (default: 8)
+    #[arg(short = 'n', long, value_name = "N", value_parser = parse_limit)]
+    limit: Option<usize>,
 
     /// Show a short summary instead of the full article
     #[arg(long)]
@@ -56,9 +57,9 @@ struct Cli {
     #[arg(long)]
     json: bool,
 
-    /// HTTP timeout in seconds
-    #[arg(long, default_value_t = 15, value_name = "SECS", value_parser = parse_timeout)]
-    timeout: u64,
+    /// HTTP timeout in seconds (default: 15)
+    #[arg(long, value_name = "SECS", value_parser = parse_timeout)]
+    timeout: Option<u64>,
 
     /// Color output: auto, always, or never
     #[arg(long, value_enum, default_value = "auto", value_name = "WHEN")]
@@ -88,22 +89,16 @@ fn parse_timeout(value: &str) -> std::result::Result<u64, String> {
 }
 
 fn main() -> ExitCode {
-    let args: Vec<_> = env::args_os().skip(1).collect();
+    let mut args: Vec<_> = env::args_os().skip(1).collect();
 
     if args.is_empty() {
         return print_help();
     }
-    let wants_sources = args
-        .iter()
-        .any(|arg| arg.as_os_str() == OsStr::new("--sources"));
-    if args[0].as_os_str() == OsStr::new("sources") || wants_sources {
-        let json = args
-            .iter()
-            .any(|arg| arg.as_os_str() == OsStr::new("--json"));
-        return print_sources(json);
+    if args[0] == OsStr::new("sources") {
+        args[0] = OsString::from("--sources");
     }
 
-    let cli = Cli::parse();
+    let cli = Cli::parse_from(std::iter::once(OsString::from("news")).chain(args));
     if cli.sources {
         return print_sources(cli.json);
     }
@@ -162,14 +157,23 @@ fn finish_output(result: io::Result<()>) -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<()> {
-    let client = fetch::client(Duration::from_secs(cli.timeout))?;
+    let config = config::load()?;
+    let limit = cli.limit.or(config.limit).unwrap_or(config::DEFAULT_LIMIT);
+    let timeout = cli
+        .timeout
+        .or(config.timeout)
+        .unwrap_or(config::DEFAULT_TIMEOUT);
+    let client = fetch::client(Duration::from_secs(timeout))?;
 
     let topic = cli
         .topic
         .as_deref()
         .map(str::trim)
         .filter(|topic| !topic.is_empty());
-    let stories = fetch::fetch(cli.source, topic, &client, cli.limit, cli.summary)?;
+    let source = cli
+        .source
+        .expect("clap requires a source when --sources is absent");
+    let stories = fetch::fetch(source, topic, &client, limit, cli.summary)?;
 
     let now = Utc::now();
     let width = terminal_width();
@@ -192,7 +196,7 @@ fn run(cli: Cli) -> Result<()> {
             })
             .collect();
         let value = serde_json::json!({
-            "source": cli.source.name(),
+            "source": source.name(),
             "topic": topic,
             "stories": stories,
         });
@@ -211,7 +215,7 @@ fn run(cli: Cli) -> Result<()> {
         let theme = Theme::from_env(cli.color);
         let mut renderer = Renderer::new(&mut out, width, !cli.no_links, theme);
         for story in &stories {
-            renderer.print_story(cli.source, topic, story, now, cli.summary)?;
+            renderer.print_story(source, topic, story, now, cli.summary)?;
         }
         renderer.flush()
     })();
@@ -230,7 +234,7 @@ mod tests {
     #[test]
     fn parses_one_source_and_topic() {
         let cli = Cli::try_parse_from(["news", "hackernews", "ask"]).unwrap();
-        assert_eq!(cli.source, Source::Hn);
+        assert_eq!(cli.source, Some(Source::Hn));
         assert_eq!(cli.topic.as_deref(), Some("ask"));
         assert!(!cli.no_links);
         assert!(!cli.sources);
@@ -240,6 +244,15 @@ mod tests {
     #[test]
     fn source_is_required() {
         assert!(Cli::try_parse_from(["news"]).is_err());
+    }
+
+    #[test]
+    fn source_listing_still_validates_all_options() {
+        let cli = Cli::try_parse_from(["news", "--sources", "--json"]).unwrap();
+        assert!(cli.sources);
+        assert!(cli.json);
+        assert!(Cli::try_parse_from(["news", "--sources", "--timeout", "0"]).is_err());
+        assert!(Cli::try_parse_from(["news", "--sources", "--unknown"]).is_err());
     }
 
     #[test]
