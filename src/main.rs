@@ -45,9 +45,9 @@ struct Cli {
     #[arg(long)]
     summary: bool,
 
-    /// Print article text character by character
-    #[arg(long)]
-    slow: bool,
+    /// Reading speed in characters per minute
+    #[arg(long, value_name = "N", value_parser = parse_cpm)]
+    cpm: Option<u32>,
 
     /// List sources and exit
     #[arg(long)]
@@ -79,6 +79,16 @@ fn parse_limit(value: &str) -> std::result::Result<usize, String> {
     } else {
         Err("must be between 1 and 100".to_string())
     }
+}
+
+fn parse_cpm(value: &str) -> std::result::Result<u32, String> {
+    let cpm = value
+        .parse::<u32>()
+        .map_err(|_| "must be a whole number".to_string())?;
+    if cpm == 0 {
+        return Err("must be greater than 0".to_string());
+    }
+    Ok(cpm)
 }
 
 fn parse_timeout(value: &str) -> std::result::Result<u64, String> {
@@ -217,7 +227,7 @@ fn run(cli: Cli) -> Result<()> {
 
     let printed = (|| -> io::Result<()> {
         let theme = Theme::from_env(cli.color);
-        let mut renderer = Renderer::new(&mut out, width, !cli.no_links, theme, cli.slow);
+        let mut renderer = Renderer::new(&mut out, width, !cli.no_links, theme, cli.cpm);
         for story in &stories {
             renderer.print_story(source, topic, story, now, cli.summary)?;
         }
@@ -243,7 +253,15 @@ mod tests {
         assert!(!cli.no_links);
         assert!(!cli.sources);
         assert!(!cli.summary);
-        assert!(!cli.slow);
+        assert_eq!(cli.cpm, None);
+    }
+
+    #[test]
+    fn parses_cpm_and_rejects_zero() {
+        let cli = Cli::try_parse_from(["news", "--cpm", "600", "bbc"]).unwrap();
+        assert_eq!(cli.cpm, Some(600));
+        assert!(Cli::try_parse_from(["news", "--cpm", "0", "bbc"]).is_err());
+        assert!(Cli::try_parse_from(["news", "--cpm", "fast", "bbc"]).is_err());
     }
 
     #[test]

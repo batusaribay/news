@@ -41,7 +41,7 @@ Arguments:
 Options:
   -n, --limit <N>       Number of stories (default: 8)
       --summary         Show a short summary instead of the full article
-      --slow            Print article text character by character
+      --cpm <N>         Reading speed in characters per minute
       --json            Print JSON instead of formatted text
       --sources         List sources and exit
       --no-links        Do not print article URLs
@@ -57,7 +57,7 @@ news bbc sport
 news github monthly
 news hackernews ask
 news --summary bbc
-news --slow bbc
+news --cpm 600 bbc
 news --json bbc -n 5
 news omarchy-releases
 news sources
