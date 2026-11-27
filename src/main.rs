@@ -45,6 +45,10 @@ struct Cli {
     #[arg(long)]
     summary: bool,
 
+    /// Print article text character by character
+    #[arg(long)]
+    slow: bool,
+
     /// List sources and exit
     #[arg(long)]
     sources: bool,
@@ -213,7 +217,7 @@ fn run(cli: Cli) -> Result<()> {
 
     let printed = (|| -> io::Result<()> {
         let theme = Theme::from_env(cli.color);
-        let mut renderer = Renderer::new(&mut out, width, !cli.no_links, theme);
+        let mut renderer = Renderer::new(&mut out, width, !cli.no_links, theme, cli.slow);
         for story in &stories {
             renderer.print_story(source, topic, story, now, cli.summary)?;
         }
@@ -239,6 +243,7 @@ mod tests {
         assert!(!cli.no_links);
         assert!(!cli.sources);
         assert!(!cli.summary);
+        assert!(!cli.slow);
     }
 
     #[test]

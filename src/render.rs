@@ -1,4 +1,6 @@
 use std::io::{self, Write};
+use std::thread::sleep;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use textwrap::wrap;
@@ -14,16 +16,18 @@ pub struct Renderer<W: Write> {
     links: bool,
     theme: Theme,
     printed: bool,
+    slow: bool,
 }
 
 impl<W: Write> Renderer<W> {
-    pub fn new(out: W, width: usize, links: bool, theme: Theme) -> Self {
+    pub fn new(out: W, width: usize, links: bool, theme: Theme, slow: bool) -> Self {
         Self {
             out,
             width,
             links,
             theme,
             printed: false,
+            slow,
         }
     }
 
@@ -75,15 +79,29 @@ impl<W: Write> Renderer<W> {
                     writeln!(self.out)?;
                 }
                 for line in wrap(paragraph, self.width) {
-                    writeln!(self.out, "{line}")?;
+                    self.print_reading(&line)?;
+                    writeln!(self.out)?;
                 }
             }
         } else if let Some(summary) = &story.summary {
             for line in wrap(summary, self.width) {
-                writeln!(self.out, "{line}")?;
+                self.print_reading(&line)?;
+                writeln!(self.out)?;
             }
         }
 
+        Ok(())
+    }
+
+    fn print_reading(&mut self, line: &str) -> io::Result<()> {
+        if !self.slow {
+            return write!(self.out, "{line}");
+        }
+        for character in line.chars() {
+            write!(self.out, "{character}")?;
+            self.out.flush()?;
+            sleep(Duration::from_millis(45));
+        }
         Ok(())
     }
 
@@ -138,7 +156,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, links, Theme::plain());
+            let mut renderer = Renderer::new(&mut buffer, 60, links, Theme::plain(), false);
             for story in stories {
                 renderer
                     .print_story(Source::Hn, None, story, now, false)
@@ -202,7 +220,7 @@ mod tests {
 
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain());
+            let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain(), false);
             renderer
                 .print_story(Source::Hn, None, &story, now, true)
                 .unwrap();
@@ -214,11 +232,28 @@ mod tests {
     }
 
     #[test]
+    fn slow_mode_keeps_the_text() {
+        let story = sample_story("Headline", "Hi.");
+        let render = |slow| {
+            let mut buffer = Vec::new();
+            {
+                let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain(), slow);
+                renderer
+                    .print_story(Source::Hn, None, &story, Utc::now(), false)
+                    .unwrap();
+                renderer.flush().unwrap();
+            }
+            String::from_utf8(buffer).unwrap()
+        };
+        assert_eq!(render(false), render(true));
+    }
+
+    #[test]
     fn prints_the_selected_topic_in_the_source_line() {
         let now = Utc.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain());
+            let mut renderer = Renderer::new(&mut buffer, 60, true, Theme::plain(), false);
             renderer
                 .print_story(
                     Source::Bbc,
@@ -247,7 +282,7 @@ mod tests {
 
         let mut buffer = Vec::new();
         {
-            let mut renderer = Renderer::new(&mut buffer, 34, false, Theme::plain());
+            let mut renderer = Renderer::new(&mut buffer, 34, false, Theme::plain(), false);
             renderer
                 .print_story(Source::Hn, None, &story, Utc::now(), false)
                 .unwrap();
