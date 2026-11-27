@@ -71,8 +71,12 @@ Hacker News, and Lobsters accept their usual topic or time-range names;
 
 ## Config
 
-Reads `~/.config/news/config.toml` if present. Flags override the file;
-defaults apply otherwise.
+Optional. Reads `~/.config/news/config.toml` if present. Flags override the file; defaults apply otherwise.
+
+```toml
+limit = 8
+timeout = 15
+```
 
 ## Install
 
